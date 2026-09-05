@@ -2,7 +2,7 @@
 # Builds the React frontend + Express API and serves both from one server.
 
 FROM node:22-slim AS build
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
 WORKDIR /app
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
