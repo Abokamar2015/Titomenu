@@ -1,0 +1,1206 @@
+Hi,
+
+I want to add a new interactive entertainment experience called:
+
+# & CO GAME NIGHT
+
+This must be built **inside the existing TITO Menu project**, but it must have its **own completely independent customer-facing UI and experience**.
+
+---
+
+## 1. CRITICAL REQUIREMENT — DO NOT MODIFY TITO MENU UI
+
+This is a hard requirement.
+
+The existing TITO Menu customer-facing interface must remain unchanged.
+
+Do NOT redesign, restructure, replace, or visually modify:
+
+* Existing TITO Menu UI
+* Homepage
+* Navigation
+* Menu pages
+* Existing customer experience
+* HR UI
+* Existing Admin UI
+* Login UI
+* Printing UI
+* Restaurants UI
+* Branches UI
+* Languages UI
+* Existing design system
+* Existing components unless technically unavoidable
+
+Do not add a large Game Night section, banner, redesign, or navigation change to the existing TITO Menu customer interface.
+
+### The architecture should be:
+
+**Existing TITO Menu**
+→ remains as it is
+
+**& CO GAME NIGHT**
+→ new isolated entertainment experience
+
+The new experience can reuse the existing technical infrastructure, but its UI must be independent.
+
+---
+
+# 2. & CO GAME NIGHT
+
+The customer-facing brand must be:
+
+**& CO**
+
+Main title:
+
+**& CO GAME NIGHT**
+
+Suggested tagline:
+
+**Think • Play • Compete • Win**
+
+The experience should feel:
+
+* Young
+* Premium
+* Modern
+* Energetic
+* Stylish
+* Social
+* Competitive
+* Suitable for a high-end café/restaurant
+
+It must NOT feel like a school quiz or childish game.
+
+---
+
+# 3. DO NOT CREATE A SEPARATE WEBSITE
+
+Do not create:
+
+* Separate website
+* Separate deployment
+* Separate backend
+* Separate database
+* Separate authentication system
+* Separate infrastructure
+
+Reuse the existing TITO infrastructure wherever appropriate:
+
+* React/Vite
+* Existing routing architecture
+* Express/API
+* Drizzle ORM
+* Supabase
+* Supabase Storage
+* Supabase Realtime
+* Existing Firebase Auth where authentication is required
+* Existing multi-tenant architecture
+
+However, keep the new Game Night UI and code isolated from the existing TITO Menu experience.
+
+---
+
+# 4. READ-ONLY AUDIT FIRST
+
+Before changing ANY code, database, UI, deployment, authentication, or configuration:
+
+Perform a complete READ-ONLY AUDIT.
+
+Inspect:
+
+### Frontend
+
+* React/Vite architecture
+* Routes
+* Components
+* Existing styles
+* Existing design system
+* Existing state management
+
+### Backend
+
+* Express
+* Existing API structure
+* Middleware
+* Authentication
+* Authorization
+* Error handling
+
+### Database
+
+* Drizzle schema
+* Supabase/Postgres
+* Existing relationships
+* Multi-tenancy
+* RLS
+
+### Authentication
+
+* Firebase Auth
+* Existing roles
+* Existing permissions
+* Existing protected routes
+
+### Realtime
+
+* Supabase Realtime configuration
+* Existing channels
+* Existing realtime patterns
+
+### Existing Features
+
+Verify that the following exist and understand their architecture:
+
+* Menu
+* Categories
+* Menu Items
+* Restaurants
+* Branches
+* Languages
+* Printing
+* HR
+* Admin
+* Authentication
+
+### Deployment
+
+Inspect the current deployment architecture and configuration.
+
+---
+
+# 5. AFTER THE AUDIT — STOP
+
+Do NOT start implementation immediately.
+
+After completing the audit, provide a report containing:
+
+1. Current architecture
+2. Existing relevant components
+3. Existing database structure
+4. Existing authentication
+5. Existing authorization
+6. Existing realtime capabilities
+7. Multi-tenant architecture
+8. Recommended integration points
+9. Potential conflicts
+10. Security risks
+11. Recommended database changes
+12. Recommended routes
+13. Recommended UI architecture
+14. Implementation phases
+15. Testing strategy
+16. Regression risks
+
+Then STOP and wait for approval before making implementation changes.
+
+---
+
+# 6. GAME NIGHT EXPERIENCE
+
+The basic customer flow should be:
+
+QR CODE
+↓
+JOIN EVENT
+↓
+ENTER NAME
+↓
+JOIN TEAM
+↓
+WAITING ROOM
+↓
+HOST STARTS EVENT
+↓
+PLAY
+↓
+LIVE RESULTS
+↓
+LEADERBOARD
+↓
+FINAL
+↓
+WINNER
+
+No permanent customer account should be required.
+
+---
+
+# 7. CUSTOMER ROUTES
+
+Use isolated routes such as:
+
+/events/:eventSlug
+
+/events/:eventSlug/join
+
+/events/:eventSlug/play
+
+/events/:eventSlug/result
+
+The exact route structure should follow the existing TITO routing conventions discovered during the audit.
+
+---
+
+# 8. HOST ROUTES
+
+Create a dedicated Host interface:
+
+/host/events/:eventId
+
+The Host interface must be separate from the customer experience.
+
+Host controls should include:
+
+* Start Event
+* Pause
+* Resume
+* Start Round
+* Start Question
+* Reveal Answer
+* Next Question
+* Skip
+* +5 Seconds
+* +10 Seconds
+* Bonus
+* Penalty
+* End Round
+* Start Final
+* End Event
+
+Every important manual action must be logged.
+
+---
+
+# 9. TV / PROJECTOR DISPLAY
+
+Create a separate read-only Display interface:
+
+/display/events/:eventId
+
+The display should show:
+
+* Welcome
+* Event title
+* Current round
+* Current question
+* Countdown
+* Answer reveal
+* Score animation
+* Live leaderboard
+* Round complete
+* Final
+* Winner
+
+The display must have NO control permissions.
+
+---
+
+# 10. TEAM SYSTEM
+
+An event can have multiple teams.
+
+Each team:
+
+* Team Name
+* Team Code
+* Captain
+* Players
+* Score
+* Rank
+* Active status
+
+Example:
+
+TEAM:
+THE WARRIORS
+
+Captain:
+Ahmed
+
+Players:
+Ahmed
+Omar
+Youssef
+Khalid
+Ali
+
+For team-answer games, only the Captain submits the final answer.
+
+Other players should see:
+
+"Discuss with your team.
+The Captain will submit the final answer."
+
+---
+
+# 11. V1 GAME LIBRARY
+
+Build the Game Engine so the following games are supported in V1:
+
+### 1. QUICK TRIVIA
+
+### 2. WORD BATTLE
+
+### 3. PICTURE BATTLE
+
+### 4. MUSIC BATTLE
+
+### 5. MYSTERY & PUZZLE
+
+### 6. CONNECTIONS
+
+### 7. WAGER
+
+### 8. SPEED BATTLE
+
+### 9. FINAL CHALLENGE
+
+The architecture must be extensible so additional games can be added later without rebuilding the entire system.
+
+---
+
+# 12. WORD BATTLE — IMPORTANT
+
+This is one of the main games.
+
+Example:
+
+LETTER:
+
+M
+
+Categories:
+
+* Boy Name
+* Girl Name
+* Animal
+* Country
+* City
+* Fruit
+* Vegetable
+* Food
+* Drink
+* Car
+* Profession
+* Plant
+* Movie
+* Singer
+* Brand
+
+The team has a limited time, for example 60 seconds.
+
+Scoring:
+
+Correct + Unique:
+10 points
+
+Correct but another team used the same answer:
+5 points
+
+Wrong:
+0 points
+
+Empty:
+0 points
+
+The system should allow the Host to review/approve answers when automatic validation is not reliable.
+
+The architecture should support different category sets and different letters for future events.
+
+---
+
+# 13. QUICK TRIVIA
+
+Questions can include:
+
+* General Knowledge
+* Saudi Arabia
+* Riyadh
+* Food
+* Coffee
+* Sports
+* Cars
+* Movies
+* Music
+* Technology
+* Brands
+* Lifestyle
+
+Support:
+
+* Multiple Choice
+* True/False
+* Short Answer
+* Number
+
+The architecture should support more question types later.
+
+---
+
+# 14. PICTURE BATTLE
+
+Support image-based questions.
+
+Examples:
+
+* Guess the person
+* Guess the car
+* Guess the brand
+* Guess the food
+* Guess the landmark
+* Guess the movie
+* Guess the coffee
+* Guess the location
+
+Optional reveal progression:
+
+10 points
+→ 8 points
+→ 6 points
+→ 4 points
+
+The earlier the team answers correctly, the more points it receives.
+
+---
+
+# 15. MUSIC BATTLE
+
+Support:
+
+* Guess the Song
+* Guess the Artist
+* Complete the Lyrics
+* Arabic Music
+* Khaleeji
+* Moroccan
+* International
+* 2000s
+* 2010s
+* 2020s
+
+Use uploaded/approved media assets.
+
+Do not include copyrighted commercial music without appropriate rights/licensing.
+
+---
+
+# 16. MYSTERY & PUZZLE
+
+Support:
+
+### Logic Riddles
+
+### Picture Puzzles
+
+### Number Puzzles
+
+### Word Puzzles
+
+### Mystery Cases
+
+### Impossible Questions
+
+### Riddle Rush
+
+Include optional clues.
+
+Example:
+
+Initial value:
+10 points
+
+Clue 1:
+8 points
+
+Clue 2:
+5 points
+
+Clue 3:
+3 points
+
+The team chooses whether to use a clue.
+
+---
+
+# 17. CONNECTIONS
+
+Present several clues/items and ask:
+
+"What connects them?"
+
+The system should support text and image clues.
+
+Difficulty should be configurable.
+
+---
+
+# 18. WAGER
+
+Before a question:
+
+How much do you want to bet?
+
+Example:
+
+5
+10
+20
+30
+
+Correct:
+
+* wager
+
+Wrong:
+
+* wager
+
+The server calculates the result.
+
+The client must never be allowed to set its own score.
+
+---
+
+# 19. SPEED BATTLE
+
+Fast questions with a short time limit.
+
+Example:
+
+30–60 seconds.
+
+Correct answer:
++5
+
+Optional speed bonus based on response time.
+
+The server must determine timing.
+
+---
+
+# 20. FINAL CHALLENGE
+
+The final round should allow the event to have a dramatic ending.
+
+Support configurable final mechanics such as:
+
+* High-risk wager
+* Jackpot
+* Final question
+* Multiple final questions
+* Comeback mechanics
+
+The Host controls the final.
+
+---
+
+# 21. POWER CARDS
+
+Support optional Power Cards.
+
+Examples:
+
+DOUBLE
+→ Double points
+
+SHIELD
+→ Protect against a penalty
+
+STEAL
+→ Steal points
+
+JOKER
+→ Special advantage
+
+ALL IN
+→ High-risk/high-reward
+
+Power Cards must be controlled and validated server-side.
+
+---
+
+# 22. ADMIN
+
+Add the minimum necessary access to manage Events.
+
+Do NOT redesign the existing Admin UI.
+
+The existing Admin should remain visually and structurally unchanged.
+
+If an Events entry is required, add the smallest isolated navigation item possible.
+
+Suggested:
+
+Events
+
+* All Events
+* Create Event
+* Question Bank
+* Rounds
+* Teams
+* Participants
+* Live Control
+* Results
+
+---
+
+# 23. EVENT CREATION
+
+Create an Event Wizard:
+
+Step 1:
+Event Details
+
+Step 2:
+Teams
+
+Step 3:
+Rounds
+
+Step 4:
+Questions
+
+Step 5:
+Rules
+
+Step 6:
+Preview
+
+Step 7:
+Publish
+
+Event settings:
+
+* Name
+* Edition
+* Branch
+* Date
+* Start Time
+* End Time
+* Maximum Teams
+* Team Size
+* Language
+* Default Points
+* Default Timer
+* Leaderboard Settings
+* Late Join
+* Phone/Session Settings
+
+---
+
+# 24. QUESTION BANK
+
+Question Bank fields should support:
+
+* Arabic question
+* English question
+* Question Type
+* Category
+* Difficulty
+* Options
+* Correct Answer
+* Points
+* Time Limit
+* Image
+* Audio
+* Video
+* Explanation
+
+Categories should include:
+
+* General Knowledge
+* Saudi Arabia
+* Riyadh
+* Food
+* Coffee
+* Luxury & Lifestyle
+* Travel
+* Cars
+* Sports
+* Music
+* Movies
+* Technology
+* Business
+* Brands
+* Visual
+* Logic
+* Trick Questions
+
+---
+
+# 25. EVENT QUESTION SNAPSHOT
+
+When an event is published:
+
+Create an immutable snapshot of all questions used in that event.
+
+If a Question Bank question is later edited, the published event must NOT change.
+
+This is mandatory.
+
+---
+
+# 26. EVENT STATES
+
+Use a server-validated state machine:
+
+DRAFT
+↓
+READY
+↓
+LIVE
+↔
+PAUSED
+↓
+COMPLETED
+
+Also support:
+
+CANCELLED
+
+The server must reject invalid state transitions.
+
+---
+
+# 27. PRE-FLIGHT CHECK
+
+Before allowing the Host to start an event:
+
+Check:
+
+* Event exists
+* Restaurant exists
+* Branch exists
+* Teams configured
+* Rounds configured
+* Questions configured
+* Correct answers exist
+* Points configured
+* Timers configured
+* Question order valid
+* Host connected
+* Display connected
+
+If something is missing:
+
+EVENT NOT READY
+
+Show the exact problem.
+
+---
+
+# 28. DATABASE
+
+Create isolated Event-related tables following the existing TITO/Drizzle conventions.
+
+Potential entities:
+
+events
+event_rounds
+questions
+round_questions
+event_question_snapshots
+event_teams
+event_players
+event_answers
+score_events
+event_audit_logs
+
+Use existing tenant/restaurant/branch relationships.
+
+Do NOT create a second database.
+
+---
+
+# 29. SCORING LEDGER
+
+Do not rely only on:
+
+team.score
+
+Every score change should have a ledger entry.
+
+Types can include:
+
+QUESTION
+SPEED_BONUS
+BONUS
+PENALTY
+WAGER
+MANUAL_ADJUSTMENT
+
+This allows complete score history and auditing.
+
+---
+
+# 30. ANSWER VALIDATION
+
+The server must validate:
+
+* Event is active
+* Round is active
+* Question is active
+* Player/team is authorized
+* Captain requirement
+* Deadline
+* Duplicate submission
+* Answer format
+
+Unique protection should prevent a team from submitting multiple final answers to the same question.
+
+---
+
+# 31. SERVER-AUTHORITATIVE TIMER
+
+Do NOT trust the client timer.
+
+The server determines:
+
+started_at
+deadline_at
+
+The client displays the remaining time based on those timestamps.
+
+Do NOT write one database update every second.
+
+---
+
+# 32. REALTIME
+
+Use the existing Supabase Realtime infrastructure where appropriate.
+
+The Host, Player and Display should stay synchronized.
+
+Events may include:
+
+EVENT_STARTED
+ROUND_STARTED
+QUESTION_STARTED
+QUESTION_PAUSED
+QUESTION_RESUMED
+QUESTION_ENDED
+ANSWER_REVEALED
+SCORE_UPDATED
+LEADERBOARD_UPDATED
+BONUS_AWARDED
+PENALTY_APPLIED
+ROUND_ENDED
+FINAL_STARTED
+EVENT_COMPLETED
+
+Clients should handle reconnects and retrieve authoritative current state.
+
+Do not assume realtime messages are guaranteed to replay.
+
+Use sequence numbers/versioning where appropriate to avoid stale updates.
+
+---
+
+# 33. SECURITY
+
+Never send the correct answer to the player before reveal.
+
+Never trust the client for:
+
+* Correct/Incorrect
+* Points
+* Bonus
+* Penalties
+* Final score
+* Wager result
+
+Implement:
+
+* Server-side validation
+* Duplicate submission protection
+* Captain authorization
+* Deadline enforcement
+* Temporary event sessions
+* Secure display access
+* Private realtime channels
+* Tenant isolation
+* RLS where applicable
+* Rate limiting
+* No service-role credentials in browser
+* No sensitive tokens in logs
+
+---
+
+# 34. MOBILE UX
+
+The customer experience must be optimized for mobile.
+
+Requirements:
+
+* Large touch targets
+* Fast loading
+* Minimal navigation
+* Clear game states
+* Countdown
+* Answer submitted state
+* Time-up state
+* Result state
+* Leaderboard
+* Connection error state
+* Reconnect handling
+
+Support Arabic RTL and English LTR.
+
+---
+
+# 35. CUSTOMER-FACING BRAND
+
+The new interface must use:
+
+**& CO**
+
+Do not use "TITO GAME NIGHT" as the customer-facing brand.
+
+TITO remains the underlying platform.
+
+The customer should feel that they are participating in an official:
+
+# & CO GAME NIGHT
+
+experience.
+
+---
+
+# 36. VISUAL DESIGN
+
+Create a new independent visual system for & CO GAME NIGHT.
+
+It should be:
+
+* Premium
+* Dark
+* Youth-oriented
+* Modern
+* Energetic
+* High contrast
+* Smooth animations
+* Large typography
+* Strong countdowns
+* Exciting leaderboard transitions
+
+Do not reuse the TITO Menu visual appearance if doing so would make the Game Night look like the existing menu.
+
+The new module should visually stand on its own.
+
+---
+
+# 37. PROTECTED EXISTING SYSTEM
+
+Before implementation, identify and protect all existing TITO Menu functionality.
+
+After implementation verify:
+
+* Existing login works
+* Existing Menu works
+* Existing Categories work
+* Existing Menu Items work
+* Restaurants work
+* Branches work
+* Languages work
+* Printing works
+* HR works
+* Existing Admin works
+* Existing APIs work
+
+No regression is acceptable.
+
+---
+
+# 38. TESTING
+
+Create tests for:
+
+### Authentication
+
+Existing authentication remains functional.
+
+### Tenant Isolation
+
+Restaurant A cannot access Restaurant B events.
+
+### Event States
+
+Invalid state transitions are rejected.
+
+### Teams
+
+Team capacity works.
+
+### Players
+
+Join/leave/reconnect works.
+
+### Answers
+
+Duplicate submissions are rejected.
+
+Late answers are rejected.
+
+Unauthorized answers are rejected.
+
+### Scoring
+
+Correct scoring.
+
+Incorrect scoring.
+
+Wager.
+
+Bonus.
+
+Penalty.
+
+Manual adjustment.
+
+### Security
+
+Attempt to manipulate:
+
+is_correct
+points
+bonus
+penalty
+
+must fail.
+
+### Question Snapshot
+
+Published events remain unchanged after Question Bank edits.
+
+### Realtime
+
+Host ↔ Player ↔ Display synchronization.
+
+### Reconnect
+
+Clients recover authoritative state after disconnect.
+
+### Regression
+
+Existing TITO features continue to work.
+
+---
+
+# 39. LOAD / REAL-WORLD TEST
+
+Before production, simulate at least:
+
+10 teams
+
+5 players per team
+
+50 simultaneous players
+
+Multiple rounds
+
+Rapid answers
+
+Reconnects
+
+Host pause/resume
+
+Display refresh
+
+Duplicate submissions
+
+Late submissions
+
+Score changes
+
+Wager
+
+Final round
+
+The system must remain stable.
+
+---
+
+# 40. IMPLEMENTATION PHASES
+
+Follow this order:
+
+PHASE 0
+Read-Only Audit
+
+PHASE 1
+Database Foundation
+
+PHASE 2
+Event Management
+
+PHASE 3
+Question Bank
+
+PHASE 4
+Game Engine
+
+PHASE 5
+Player Experience
+
+PHASE 6
+Scoring
+
+PHASE 7
+Host Control
+
+PHASE 8
+TV Display
+
+PHASE 9
+Realtime
+
+PHASE 10
+Security
+
+PHASE 11
+Testing
+
+PHASE 12
+Production Verification
+
+Do not skip the audit.
+
+Do not combine everything into one uncontrolled change.
+
+---
+
+# 41. FINAL ARCHITECTURE PRINCIPLE
+
+The final architecture should conceptually be:
+
+TITO PLATFORM
+│
+├── Existing TITO Menu
+│   └── DO NOT MODIFY CUSTOMER UI
+│
+├── Existing HR
+│   └── DO NOT MODIFY
+│
+├── Existing Admin
+│   └── Minimal Events integration only
+│
+└── & CO GAME NIGHT
+├── Customer Experience
+├── Mobile Player
+├── Host Control
+├── TV Display
+├── Game Engine
+├── Event Management
+├── Question Bank
+├── Teams
+├── Scoring
+└── Realtime
+
+The goal is to create a powerful new entertainment engine while keeping the existing TITO Menu system stable and visually untouched.
+
+### FIRST ACTION:
+
+Perform the complete READ-ONLY AUDIT.
+
+Do not modify anything until the audit report is completed and reviewed/approved.
