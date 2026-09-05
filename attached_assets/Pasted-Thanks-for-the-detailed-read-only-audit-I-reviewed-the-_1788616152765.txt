@@ -1,0 +1,235 @@
+Thanks for the detailed read-only audit.
+
+I reviewed the findings and I agree with the overall architecture and the decision to keep **& CO GAME NIGHT completely isolated from the existing TITO Menu customer UI**.
+
+You may proceed with implementation, but please follow these additional requirements:
+
+### 1. Protect the existing TITO Menu
+
+The existing TITO Menu customer experience must remain untouched.
+
+Do not redesign or modify the existing Menu UI, customer routes, MenuPage, PrintMenuPage, or existing customer-facing components.
+
+& CO GAME NIGHT must use its own isolated UI, routes, components and styling.
+
+---
+
+### 2. Do not rebuild authentication
+
+The audit correctly identified that Firebase Auth is not currently used.
+
+Do NOT start a general authentication migration or rebuild the existing authentication system as part of this project.
+
+For & CO GAME NIGHT:
+
+* Existing TITO staff/admin authentication should be reused for management/host access.
+* Players should use temporary event sessions.
+* Captains/players do not need permanent accounts.
+
+Any authentication changes outside Game Night are out of scope unless absolutely required for security.
+
+---
+
+### 3. Supabase
+
+Before implementing database-dependent features, verify the current Supabase connection and determine why it is currently unavailable.
+
+Do not create a replacement database or alternative infrastructure.
+
+Do not make destructive database changes.
+
+Use controlled, reviewable migrations instead of relying on uncontrolled Drizzle Push changes for the new Game Night tables.
+
+---
+
+### 4. MVP PRIORITY
+
+I do NOT want all nine games implemented before we have a working product.
+
+Build the Game Night engine incrementally.
+
+### MVP-1 must include:
+
+* Event creation
+* Event publishing
+* QR code
+* Player join
+* Temporary player sessions
+* Teams
+* Captain
+* Waiting room
+* Quick Trivia
+* Word Battle
+* Server-side scoring
+* Timer
+* Host Control
+* TV/Projector Display
+* Live Leaderboard
+* Realtime synchronization
+* Pause/Resume
+* Answer Reveal
+* Arabic/English
+* Reconnect handling
+* Basic audit logging
+
+The first objective is to have a complete playable & CO GAME NIGHT from beginning to end.
+
+---
+
+### 5. Word Battle is a CORE V1 GAME
+
+Do not postpone Word Battle until the final stage.
+
+After the core event/game engine is proven with Quick Trivia, implement Word Battle immediately.
+
+Word Battle must support categories such as:
+
+* Boy Name
+* Girl Name
+* Animal
+* Country
+* City
+* Fruit
+* Vegetable
+* Food
+* Drink
+* Car
+* Profession
+* Plant
+* Movie
+* Singer
+* Brand
+
+It must support configurable letters, categories, time limits and scoring rules.
+
+---
+
+### 6. Advanced games after MVP-1
+
+After MVP-1 is stable, implement:
+
+1. Picture Battle
+2. Music Battle
+3. Mystery & Puzzle
+4. Connections
+5. Wager
+6. Speed Battle
+7. Final Challenge
+8. Power Cards
+
+These should use the same underlying Game Engine rather than creating separate systems for every game.
+
+---
+
+### 7. Admin UI
+
+Keep the existing Admin UI unchanged as much as possible.
+
+If Events needs to be added to the navigation, make it a minimal isolated entry.
+
+Do not redesign the Admin dashboard.
+
+Game Night management should open into its own dedicated interface.
+
+---
+
+### 8. Architecture
+
+The final concept should remain:
+
+TITO PLATFORM
+→ existing TITO Menu
+→ existing systems
+
+AND
+
+& CO GAME NIGHT
+→ independent customer UI
+→ independent Host UI
+→ independent Display UI
+→ shared existing infrastructure
+
+The two experiences must not visually interfere with each other.
+
+---
+
+### 9. Security remains mandatory
+
+Continue with the security requirements from the audit:
+
+* Server-authoritative scoring
+* Server-authoritative timer
+* Correct answers hidden until reveal
+* Captain authorization
+* Duplicate answer prevention
+* Tenant isolation
+* Secure temporary sessions
+* Display access control
+* Rate limiting
+* No service-role credentials in browser
+* No sensitive tokens in logs
+* Audit logging
+
+---
+
+### 10. Testing
+
+Before declaring MVP-1 complete, test a realistic event:
+
+10 teams
+5 players per team
+50 concurrent players
+
+Test:
+
+* Join
+* Team assignment
+* Waiting room
+* Question
+* Answer
+* Timer
+* Reveal
+* Scoring
+* Leaderboard
+* Pause
+* Resume
+* Reconnect
+* Duplicate answer
+* Late answer
+* Host disconnect
+* Display refresh
+
+Also perform regression testing on the existing TITO Menu.
+
+---
+
+### 11. Important development rule
+
+Work incrementally.
+
+After each major phase:
+
+1. Run tests
+2. Run production build
+3. Verify existing TITO Menu functionality
+4. Verify Game Night functionality
+5. Report what changed
+6. Report any risks or issues
+
+Do not make a large uncontrolled batch of changes.
+
+---
+
+### 12. Final objective
+
+The first milestone is NOT "nine games completed."
+
+The first milestone is:
+
+**A real, stable, playable & CO GAME NIGHT event.**
+
+A customer should be able to scan a QR code, join a team, play Trivia and Word Battle from their phone, while the Host controls the event and the TV displays the game and live leaderboard.
+
+Once this MVP is stable, we will expand the Game Library.
+
+You may now proceed with MVP-1 implementation following these requirements.
