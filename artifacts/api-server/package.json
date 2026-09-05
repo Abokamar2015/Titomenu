@@ -7,7 +7,9 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:game-night": "rm -rf .game-night-test-dist && esbuild src/game-night/*.test.ts --bundle --platform=node --format=esm --outdir=.game-night-test-dist --out-extension:.js=.mjs && node --test .game-night-test-dist/*.test.mjs; status=$?; rm -rf .game-night-test-dist; exit $status",
+    "test:game-night:integration": "rm -rf .game-night-integration-test-dist && esbuild src/game-night/persistence.integration.test.ts --bundle --platform=node --format=cjs --outfile=.game-night-integration-test-dist/persistence.integration.test.cjs && GAME_NIGHT_INTEGRATION=1 node --test .game-night-integration-test-dist/persistence.integration.test.cjs; status=$?; rm -rf .game-night-integration-test-dist; exit $status"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
