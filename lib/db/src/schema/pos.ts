@@ -37,6 +37,7 @@ export const posOrdersTable = pgTable(
     discountMinor: integer("discount_minor").notNull().default(0),
     discountReason: text("discount_reason").notNull().default(""),
     cashReceivedMinor: integer("cash_received_minor"),
+    cardPaidMinor: integer("card_paid_minor"),
     payment: text("payment").notNull(),
     service: text("service").notNull(),
     note: text("note").notNull().default(""),
