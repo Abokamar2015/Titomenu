@@ -28,6 +28,8 @@ ENV NODE_ENV=production
 COPY --from=build /app/artifacts/api-server/dist ./server
 COPY --from=build /app/artifacts/cafe-menu/dist/public ./public
 
+COPY --from=build /app/lib/db/pos-migrations ./pos-migrations
+
 ENV STATIC_DIR=/app/public
 # Railway injects PORT automatically
 EXPOSE 8080
