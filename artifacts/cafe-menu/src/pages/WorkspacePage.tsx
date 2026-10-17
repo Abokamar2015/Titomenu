@@ -1,6 +1,7 @@
 import {
   isAuthenticated,
   getCurrentUser,
+  getCurrentMembership,
   getCurrentRestaurantId,
   getCurrentRestaurantSlug,
   DEFAULT_SLUG,
@@ -34,11 +35,18 @@ export default function WorkspacePage() {
             ...(rid
               ? [
                   ["الكاشير", "بيع الأصناف وتسجيل التحصيل والمبيعات", "/pos"],
-                  [
-                    "إدارة المنيو",
-                    "المنتجات والأسعار والتصنيفات والمظهر",
-                    "/admin",
-                  ],
+                  ...(user?.is_super_admin ||
+                  ["owner", "manager"].includes(
+                    getCurrentMembership()?.role || "",
+                  )
+                    ? [
+                        [
+                          "إدارة المنيو",
+                          "المنتجات والأسعار والتصنيفات والمظهر",
+                          "/admin",
+                        ],
+                      ]
+                    : []),
                   [
                     "منيو العملاء",
                     "عرض قائمة مطعمك الحالية",

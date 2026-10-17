@@ -228,11 +228,11 @@ router.get("/menu/settings", async (_req, res): Promise<void> => {
 
 // =====================================================================
 // TENANT ADMIN routes: /restaurants/:restaurantId/menu/...
-// Menu writes: owner, manager, staff. Settings writes: owner, manager.
+// Menu and settings management are restricted to owners and managers.
 // =====================================================================
 const canEditMenu = [
   requireUser,
-  requireRestaurantRole("owner", "manager", "staff"),
+  requireRestaurantRole("owner", "manager"),
 ] as const;
 const canEditSettings = [
   requireUser,

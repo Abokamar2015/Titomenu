@@ -8,6 +8,7 @@ import {
 } from "@/lib/supabase";
 import { LoginScreen } from "./AdminPage";
 import "./pos.css";
+import { toast } from "sonner";
 type Product = {
   id: string;
   nameAr: string;
@@ -21,7 +22,21 @@ type Branch = {
   nameAr: string;
   nameEn?: string;
 };
+type Access = { restaurantId: string; userId: string; manager: boolean };
+type HeldOrder = {
+  id: string;
+  cart: Record<string, number>;
+  note: string;
+  service: string;
+  payment: string;
+  branch: string;
+  created: string;
+};
 type Order = {
+  status: string;
+  createdBy: string | null;
+  voidReason: string | null;
+  voidedAt: string | null;
   id: string;
   branchId: string | null;
   items: {
@@ -173,6 +188,10 @@ function Cashier() {
     [busy, B] = useState(false),
     [loading, L] = useState(true),
     [receipt, R] = useState<Order | null>(null);
+  const [access, setAccess] = useState<Access | null>(null);
+  const [held, setHeld] = useState<HeldOrder[]>([]);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const draftKey = access ? `tito-held-${rid}-${access.userId}` : null;
   const inflight = useRef(false),
     requestId = useRef<string | null>(null);
   const slug = getCurrentRestaurantSlug() || DEFAULT_SLUG;
@@ -194,6 +213,7 @@ function Cashier() {
     try {
       const j = await api("catalog");
       P(j.products);
+      setAccess(j.access);
       H(j.branches);
       V((old) =>
         j.branches.some((b: Branch) => b.id === old)
@@ -235,11 +255,52 @@ function Cashier() {
       cancelled = true;
     };
   }, [tab, date, branch]);
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      const value = JSON.parse(localStorage.getItem(draftKey) || "[]");
+      setHeld(
+        Array.isArray(value)
+          ? value
+              .filter(
+                (x) =>
+                  x &&
+                  typeof x.id === "string" &&
+                  x.cart &&
+                  typeof x.cart === "object" &&
+                  typeof x.note === "string" &&
+                  ["cash", "card"].includes(x.payment) &&
+                  ["takeaway", "dinein"].includes(x.service) &&
+                  typeof x.branch === "string" &&
+                  typeof x.created === "string",
+              )
+              .slice(0, 10)
+          : [],
+      );
+    } catch {
+      setHeld([]);
+    }
+  }, [draftKey]);
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        setCartOpen(false);
+        R(null);
+      }
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, []);
+  const paidOrders = orders.filter((o) => o.status !== "voided");
   const lines = Object.entries(cart)
       .map(([id, qty]) => ({ ...products.find((p) => p.id === id)!, qty }))
       .filter((x) => x.id),
     total = lines.reduce((s, x) => s + Math.round(x.price * 100) * x.qty, 0),
-    sum = orders.reduce((s, o) => s + o.totalMinor, 0);
+    sum = paidOrders.reduce((s, o) => s + o.totalMinor, 0);
   function change(id: string, delta: number) {
     if (inflight.current) return;
     requestId.current = null;
@@ -251,6 +312,177 @@ function Cashier() {
       if (!next[id]) delete next[id];
       return next;
     });
+  }
+  const text = (ar: string, en: string) => (lang === "ar" ? ar : en);
+  function clearCart() {
+    if (busy || !lines.length) return;
+    if (
+      !confirm(
+        text(
+          "إلغاء الطلب الحالي وإفراغ السلة؟",
+          "Cancel the current order and clear the cart?",
+        ),
+      )
+    )
+      return;
+    C({});
+    Q("");
+    requestId.current = null;
+  }
+  function storeHeld(next: HeldOrder[]) {
+    if (!draftKey)
+      throw Error(text("انتظر تحميل الحساب", "Wait for your account to load"));
+    localStorage.setItem(draftKey, JSON.stringify(next));
+    setHeld(next);
+  }
+  function holdOrder() {
+    if (busy || !lines.length) return;
+    if (held.length >= 10) {
+      E(
+        text(
+          "يمكن تعليق 10 طلبات فقط على هذا الجهاز",
+          "You can hold up to 10 orders on this device",
+        ),
+      );
+      return;
+    }
+    try {
+      storeHeld([
+        ...held,
+        {
+          id: crypto.randomUUID(),
+          cart: { ...cart },
+          note,
+          service,
+          payment,
+          branch,
+          created: new Date().toISOString(),
+        },
+      ]);
+      C({});
+      Q("");
+      requestId.current = null;
+      setCartOpen(false);
+      toast.success(
+        text("تم تعليق الطلب على هذا الجهاز", "Order held on this device"),
+      );
+    } catch {
+      E(
+        text(
+          "تعذر تعليق الطلب. تحقق من مساحة المتصفح",
+          "Unable to hold the order. Check browser storage",
+        ),
+      );
+    }
+  }
+  function restoreHeld(h: HeldOrder) {
+    if (busy) return;
+    if (
+      lines.length &&
+      !confirm(
+        text(
+          "استبدال السلة الحالية بالطلب المعلّق؟",
+          "Replace the current cart with the held order?",
+        ),
+      )
+    )
+      return;
+    const valid = Object.fromEntries(
+      Object.entries(h.cart).filter(
+        ([id, q]) =>
+          products.some((p) => p.id === id) &&
+          Number.isInteger(q) &&
+          q > 0 &&
+          q <= 999,
+      ),
+    );
+    if (!Object.keys(valid).length) {
+      E(
+        text(
+          "أصناف هذا الطلب لم تعد متاحة",
+          "The products in this order are no longer available",
+        ),
+      );
+      return;
+    }
+    if (branches.length && !branches.some((b) => b.id === h.branch)) {
+      E(text("فرع الطلب غير متاح", "This order branch is no longer available"));
+      return;
+    }
+    try {
+      storeHeld(held.filter((x) => x.id !== h.id));
+    } catch {
+      E(text("تعذر فتح الطلب المعلّق", "Unable to restore held order"));
+      return;
+    }
+    C(valid);
+    Q(h.note);
+    G(h.service);
+    Y(h.payment);
+    V(h.branch);
+    requestId.current = null;
+    setCartOpen(true);
+    if (Object.keys(valid).length !== Object.keys(h.cart).length)
+      toast.warning(
+        text(
+          "تم استبعاد الأصناف غير المتاحة، والأسعار حسب المنيو الحالي",
+          "Unavailable products were excluded. Current menu prices apply",
+        ),
+      );
+    else
+      toast.success(
+        text(
+          "تم فتح الطلب بأسعار المنيو الحالية",
+          "Order restored at current menu prices",
+        ),
+      );
+  }
+  function deleteHeld(id: string) {
+    if (busy || !confirm(text("حذف الطلب المعلّق؟", "Delete this held order?")))
+      return;
+    try {
+      storeHeld(held.filter((x) => x.id !== id));
+    } catch {
+      E(text("تعذر حذف الطلب المعلّق", "Unable to delete held order"));
+    }
+  }
+  async function voidOrder(o: Order) {
+    if (busy || o.status === "voided") return;
+    const reason = prompt(
+      text(
+        "سبب إلغاء الطلب المحفوظ (3 أحرف على الأقل). إرجاع المال يتم خارج النظام.",
+        "Reason for voiding this saved order (at least 3 characters). Refund money externally.",
+      ),
+    );
+    if (reason === null) return;
+    if (reason.trim().length < 3 || reason.trim().length > 300) {
+      E(
+        text(
+          "أدخل سببًا من 3 إلى 300 حرف",
+          "Enter a reason between 3 and 300 characters",
+        ),
+      );
+      return;
+    }
+    B(true);
+    E("");
+    try {
+      const updated = await api(`orders/${o.id}/void`, {
+        reason: reason.trim(),
+      });
+      O((prev) => prev.map((x) => (x.id === o.id ? updated : x)));
+      if (receipt?.id === o.id) R(updated);
+      toast.success(
+        text(
+          "تم إلغاء الطلب واستبعاده من إجمالي المبيعات",
+          "Order voided and excluded from sales totals",
+        ),
+      );
+    } catch (e) {
+      E((e as Error).message);
+    } finally {
+      B(false);
+    }
   }
   async function checkout() {
     if (inflight.current || !lines.length) return;
@@ -281,12 +513,21 @@ function Cashier() {
   }
   function exportCsv() {
     const rows = [
-      [t("رقم الطلب"), t("تاريخ"), t("الدفع"), t("الإجمالي ر.س")],
+      [
+        t("رقم الطلب"),
+        t("تاريخ"),
+        t("الدفع"),
+        t("الإجمالي ر.س"),
+        text("الحالة", "Status"),
+        text("سبب الإلغاء", "Void reason"),
+      ],
       ...orders.map((o) => [
         o.id,
         o.createdAt,
         o.payment === "cash" ? t("نقدي") : t("بطاقة"),
         (o.totalMinor / 100).toFixed(2),
+        o.status === "voided" ? text("ملغى", "Voided") : text("مدفوع", "Paid"),
+        o.voidReason || "",
       ]),
     ];
     const url = URL.createObjectURL(
@@ -295,7 +536,17 @@ function Cashier() {
           "\ufeff" +
             rows
               .map((r) =>
-                r.map((v) => '"' + v.replaceAll('"', '""') + '"').join(","),
+                r
+                  .map(
+                    (v) =>
+                      '"' +
+                      (/^[=+@\-\t\r\n]/.test(v) ? "'" + v : v).replaceAll(
+                        '"',
+                        '""',
+                      ) +
+                      '"',
+                  )
+                  .join(","),
               )
               .join("\r\n"),
         ],
@@ -333,11 +584,6 @@ function Cashier() {
             "\u2637 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631",
           )}
         </button>
-        <a href="/admin">
-          {t(
-            "\u25A6 \u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A",
-          )}
-        </a>
         <a href={slug === DEFAULT_SLUG ? "/" : `/r/${slug}`}>
           {t(
             "\u2197 \u0645\u0646\u064A\u0648 \u0627\u0644\u0639\u0645\u0644\u0627\u0621",
@@ -411,6 +657,7 @@ function Cashier() {
                   )}
                 </h2>
                 <input
+                  ref={searchRef}
                   aria-label={t("بحث عن صنف")}
                   placeholder={t("ابحث عن صنف…")}
                   value={search}
@@ -422,6 +669,40 @@ function Cashier() {
                   )}
                 </button>
               </div>
+              {held.length > 0 && (
+                <details className="tito-held">
+                  <summary>
+                    {text(
+                      "طلبات معلّقة على هذا الجهاز",
+                      "Held orders on this device",
+                    )}{" "}
+                    ({held.length})
+                  </summary>
+                  {held.map((h, i) => (
+                    <div className="tito-held-row" key={h.id}>
+                      <span>
+                        {text("طلب", "Order")} {i + 1} ·{" "}
+                        {new Date(h.created).toLocaleTimeString(locale, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {Object.values(h.cart).reduce((sum, n) => sum + n, 0)}{" "}
+                        {text("أصناف", "items")}
+                      </span>
+                      <button disabled={busy} onClick={() => restoreHeld(h)}>
+                        {text("فتح", "Open")}
+                      </button>
+                      <button
+                        disabled={busy}
+                        className="tito-danger"
+                        onClick={() => deleteHeld(h.id)}
+                      >
+                        {text("حذف", "Delete")}
+                      </button>
+                    </div>
+                  ))}
+                </details>
+              )}
               <div className="tito-chips">
                 {["__all", ...new Set(products.map((p) => p.category))].map(
                   (c) => (
@@ -484,15 +765,10 @@ function Cashier() {
               )}
               {!loading && !products.length && (
                 <p className="tito-empty">
-                  {t(
-                    "\u0644\u0627 \u062A\u0648\u062C\u062F \u0623\u0635\u0646\u0627\u0641 \u0645\u062A\u0627\u062D\u0629. \u0623\u0636\u0641\u0647\u0627 \u0623\u0648 \u0641\u0639\u0651\u0644\u0647\u0627 \u0645\u0646",
-                  )}{" "}
-                  <a href="/admin">
-                    {t(
-                      "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0646\u064A\u0648",
-                    )}
-                  </a>
-                  .
+                  {text(
+                    "لا توجد أصناف متاحة. تواصل مع المدير لتحديث المنيو.",
+                    "No available products. Contact your manager to update the menu.",
+                  )}
                 </p>
               )}
             </section>
@@ -511,6 +787,21 @@ function Cashier() {
                   "\u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u062D\u0627\u0644\u064A",
                 )}
               </h2>
+              <div className="tito-cart-actions">
+                <button
+                  disabled={busy || !lines.length || !access}
+                  onClick={holdOrder}
+                >
+                  {text("تعليق الطلب", "Hold order")}
+                </button>
+                <button
+                  className="tito-danger"
+                  disabled={busy || !lines.length}
+                  onClick={clearCart}
+                >
+                  {text("إلغاء الطلب", "Cancel order")}
+                </button>
+              </div>
               <div className="tito-switch">
                 {[
                   ["takeaway", t("سفري")],
@@ -546,6 +837,18 @@ function Cashier() {
                         −
                       </button>
                       <span>{p.qty}</span>
+                      <button
+                        className="tito-danger"
+                        disabled={busy}
+                        onClick={() => change(p.id, -p.qty)}
+                        aria-label={
+                          text("حذف الصنف", "Remove item") +
+                          " " +
+                          productName(p)
+                        }
+                      >
+                        {text("حذف", "Remove")}
+                      </button>
                       <button disabled={busy} onClick={() => change(p.id, 1)}>
                         +
                       </button>
@@ -644,16 +947,17 @@ function Cashier() {
             <div className="tito-stats">
               {[
                 [t("إجمالي المبيعات"), money(sum) + t(" ر.س")],
-                [t("عدد الطلبات"), orders.length],
+                [t("عدد الطلبات"), paidOrders.length],
                 [
                   t("متوسط الطلب"),
-                  money(orders.length ? Math.round(sum / orders.length) : 0) +
-                    t(" ر.س"),
+                  money(
+                    paidOrders.length ? Math.round(sum / paidOrders.length) : 0,
+                  ) + t(" ر.س"),
                 ],
                 [
                   t("المبيعات النقدية"),
                   money(
-                    orders
+                    paidOrders
                       .filter((o) => o.payment === "cash")
                       .reduce((s, o) => s + o.totalMinor, 0),
                   ) + t(" ر.س"),
@@ -689,7 +993,27 @@ function Cashier() {
                   <tbody>
                     {orders.map((o) => (
                       <tr key={o.id}>
-                        <td dir="ltr">#{o.id.slice(0, 8).toUpperCase()}</td>
+                        <td>
+                          <span dir="ltr">
+                            #{o.id.slice(0, 8).toUpperCase()}
+                          </span>
+                          <small
+                            className={
+                              o.status === "voided"
+                                ? "tito-status-void"
+                                : "tito-status-paid"
+                            }
+                          >
+                            {o.status === "voided"
+                              ? text("ملغى", "Voided")
+                              : text("مدفوع", "Paid")}
+                          </small>
+                          {o.voidReason && (
+                            <small className="tito-void-reason">
+                              {o.voidReason}
+                            </small>
+                          )}
+                        </td>
                         <td>
                           {new Date(o.createdAt).toLocaleTimeString(locale, {
                             timeZone: "Asia/Riyadh",
@@ -706,6 +1030,18 @@ function Cashier() {
                           {t("\u0631.\u0633")}
                         </td>
                         <td>
+                          {o.status !== "voided" &&
+                            access &&
+                            (access.manager ||
+                              o.createdBy === access.userId) && (
+                              <button
+                                className="tito-danger"
+                                disabled={busy}
+                                onClick={() => voidOrder(o)}
+                              >
+                                {text("إلغاء الطلب", "Void order")}
+                              </button>
+                            )}
                           <button onClick={() => R(o)}>
                             {t(
                               "\u0639\u0631\u0636 \u0648\u0637\u0628\u0627\u0639\u0629",
@@ -765,6 +1101,21 @@ function Cashier() {
               </button>
             </div>
             <h2>TITO POS</h2>
+            {receipt.status === "voided" && (
+              <p className="tito-status-void">
+                {text(
+                  "طلب ملغى — مستبعد من المبيعات",
+                  "VOIDED — excluded from sales",
+                )}
+                <br />
+                {receipt.voidReason}
+                <br />
+                {receipt.voidedAt &&
+                  new Date(receipt.voidedAt).toLocaleString(locale, {
+                    timeZone: "Asia/Riyadh",
+                  })}
+              </p>
+            )}
             <p>
               {t(
                 "\u0625\u064A\u0635\u0627\u0644 \u0628\u064A\u0639 \u063A\u064A\u0631 \u0636\u0631\u064A\u0628\u064A",

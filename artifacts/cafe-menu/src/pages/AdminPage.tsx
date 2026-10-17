@@ -16,7 +16,7 @@ import {
   updateSortOrders,
   login, logout, isAuthenticated,
   getCurrentRestaurantSlug, DEFAULT_SLUG,
-  getCurrentUser, getCurrentRestaurantId,
+  getCurrentUser, getCurrentRestaurantId, getCurrentMembership,
 } from '@/lib/supabase';
 import AccountMenu from '@/components/AccountMenu';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -597,7 +597,8 @@ export default function AdminPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { if (authed) load(); }, [authed]);
+  const canManageMenu = !!getCurrentUser()?.is_super_admin || ['owner','manager'].includes(getCurrentMembership()?.role || '');
+  useEffect(() => { if (authed && canManageMenu) load(); }, [authed,canManageMenu]);
 
   if (!authed) return (
     <LoginScreen onLogin={() => {
@@ -610,6 +611,9 @@ export default function AdminPage() {
       setAuthed(true);
     }} />
   );
+
+  const memberRole = getCurrentMembership()?.role;
+  if (!getCurrentUser()?.is_super_admin && memberRole !== 'owner' && memberRole !== 'manager') return <div dir="rtl" className="dark min-h-screen bg-background text-foreground p-12"><h1 className="text-xl">إدارة المنتجات متاحة للمدير فقط</h1><a href="/pos" className="text-primary">العودة للكاشير ←</a></div>;
 
   const filtered = items.filter(item => {
     const matchCat = activeCategory === 'all' || item.category === activeCategory;

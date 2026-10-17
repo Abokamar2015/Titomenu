@@ -7,6 +7,7 @@ import {
   branchesTable,
   menuItemsTable,
   posOrdersTable,
+  membershipsTable,
 } from "@workspace/db";
 import {
   requireUser,
@@ -14,6 +15,7 @@ import {
   type AuthedRequest,
 } from "../lib/auth";
 import { calculateOrder } from "../pos/checkout";
+import { canManageProducts, canVoidOrder } from "../pos/permissions";
 const router: IRouter = Router();
 const path = "/restaurants/:restaurantId/pos";
 router.use(
@@ -37,6 +39,25 @@ router.use(
         res.status(403).json({ error: "المطعم غير متاح" });
         return;
       }
+      const [membership] = req.user!.isSuperAdmin
+        ? []
+        : await db
+            .select()
+            .from(membershipsTable)
+            .where(
+              and(
+                eq(membershipsTable.restaurantId, id),
+                eq(membershipsTable.userId, req.user!.id),
+              ),
+            );
+      res.locals.posAccess = {
+        restaurantId: id,
+        userId: req.user!.id,
+        manager: canManageProducts(
+          membership?.role || null,
+          req.user!.isSuperAdmin,
+        ),
+      };
       res.locals.restaurantId = id;
       next();
     } catch (e) {
@@ -62,7 +83,9 @@ router.get(path + "/catalog", async (_req, res, next) => {
         .from(branchesTable)
         .where(eq(branchesTable.restaurantId, restaurantId)),
     ]);
-    res.set("Cache-Control", "no-store").json({ products, branches });
+    res
+      .set("Cache-Control", "no-store")
+      .json({ products, branches, access: res.locals.posAccess });
   } catch (e) {
     next(e);
   }
@@ -169,6 +192,65 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
     next(e);
   }
 });
+router.post(
+  path + "/orders/:orderId/void",
+  async (req: AuthedRequest, res, next) => {
+    const parsed = z
+      .object({ reason: z.string().trim().min(3).max(300) })
+      .safeParse(req.body);
+    const id = z.uuid().safeParse(req.params.orderId);
+    if (!parsed.success || !id.success) {
+      res.status(400).json({ error: "أدخل سبب الإلغاء (3 أحرف على الأقل)" });
+      return;
+    }
+    const access = res.locals.posAccess as {
+      restaurantId: string;
+      userId: string;
+      manager: boolean;
+    };
+    try {
+      const result = await db.transaction(async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(posOrdersTable)
+          .where(
+            and(
+              eq(posOrdersTable.id, id.data),
+              eq(posOrdersTable.restaurantId, access.restaurantId),
+            ),
+          )
+          .for("update");
+        if (!order) return { status: 404, error: "الطلب غير موجود" };
+        if (!canVoidOrder(access, order))
+          return { status: 403, error: "لا يمكنك إلغاء طلب موظف آخر" };
+        if (order.status === "voided") return { status: 200, order };
+        const [updated] = await tx
+          .update(posOrdersTable)
+          .set({
+            status: "voided",
+            voidReason: parsed.data.reason,
+            voidedAt: new Date(),
+            voidedBy: req.user!.id,
+          })
+          .where(
+            and(
+              eq(posOrdersTable.id, order.id),
+              eq(posOrdersTable.restaurantId, access.restaurantId),
+              eq(posOrdersTable.status, "paid"),
+            ),
+          )
+          .returning();
+        return { status: 200, order: updated };
+      });
+      res
+        .status(result.status)
+        .set("Cache-Control", "no-store")
+        .json(result.error ? { error: result.error } : result.order);
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 router.get(path + "/orders", async (req, res, next) => {
   const date = z
     .string()
