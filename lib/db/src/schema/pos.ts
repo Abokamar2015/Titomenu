@@ -36,6 +36,12 @@ export const posOrdersTable = pgTable(
     payment: text("payment").notNull(),
     service: text("service").notNull(),
     note: text("note").notNull().default(""),
+    status: text("status").notNull().default("paid"),
+    voidReason: text("void_reason"),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedBy: uuid("voided_by").references(() => usersTable.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
