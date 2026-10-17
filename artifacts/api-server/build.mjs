@@ -118,6 +118,14 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+  await esbuild({
+    entryPoints: [path.resolve(artifactDir, "../../lib/db/scripts/run-pos-migrations.mjs")],
+    outfile: path.join(distDir, "pos-migrate.cjs"),
+    bundle: true, platform: "node", format: "cjs", external: ["pg-native"],
+    define: { "import.meta.url": "__migrationUrl" },
+    banner: { js: "const __migrationUrl = require('node:url').pathToFileURL(__filename).href;" },
+  });
+
 }
 
 buildAll().catch((err) => {

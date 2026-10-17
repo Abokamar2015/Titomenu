@@ -6,6 +6,9 @@ import PrintMenuPage from "@/pages/PrintMenuPage";
 import SuperAdminPage from "@/pages/SuperAdminPage";
 import ProfilePage from "@/pages/ProfilePage";
 
+import PosPage from "@/pages/PosPage";
+import WorkspacePage from "@/pages/WorkspacePage";
+
 function Router() {
   return (
     <Switch>
@@ -13,6 +16,8 @@ function Router() {
       <Route path="/menu" component={MenuPage} />
       <Route path="/r/:slug" component={MenuPage} />
       <Route path="/r/:slug/print" component={PrintMenuPage} />
+      <Route path="/pos" component={PosPage} />
+      <Route path="/dashboard" component={WorkspacePage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/sa" component={SuperAdminPage} />
       <Route path="/profile" component={ProfilePage} />

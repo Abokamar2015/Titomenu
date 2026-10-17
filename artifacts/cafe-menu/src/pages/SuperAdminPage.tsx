@@ -537,6 +537,7 @@ export default function SuperAdminPage() {
             <Button size="sm" onClick={() => setCreateOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs h-8">
               <Plus className="w-4 h-4" /><span className="hidden sm:inline">مطعم جديد</span>
             </Button>
+            <a href="/dashboard" className="text-sm text-primary px-3">مساحة العمل</a>
             <AccountMenu onLogout={() => { logout(); setAuthed(false); }} />
           </div>
         </div>

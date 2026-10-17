@@ -32,7 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
 /* ===================== LOGIN ===================== */
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
+export function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
@@ -695,6 +695,8 @@ export default function AdminPage() {
               <Plus className="w-3.5 h-3.5" />{activeTab === 'menu' ? 'إضافة صنف' : 'إضافة تصنيف'}
             </Button>
           )}
+          <a href="/dashboard" className="text-sm text-primary px-3">مساحة العمل</a>
+          <a href="/pos" className="text-sm text-primary px-3">الكاشير</a>
           <AccountMenu
             onLogout={() => { logout(); setAuthed(false); }}
             extraItems={getCurrentUser()?.is_super_admin ? (
