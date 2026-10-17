@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { eq, and, desc, gte, lt, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lt, inArray, isNull } from "drizzle-orm";
 import {
   db,
   restaurantsTable,
   branchesTable,
   menuItemsTable,
   posOrdersTable,
+  posShiftsTable,
   membershipsTable,
 } from "@workspace/db";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../lib/auth";
 import { calculateOrder, calculateSettlement } from "../pos/checkout";
 import { canManageProducts, canVoidOrder } from "../pos/permissions";
+import shiftsRouter from "./posShifts";
 const router: IRouter = Router();
 const path = "/restaurants/:restaurantId/pos";
 router.use(
@@ -65,6 +67,7 @@ router.use(
     }
   },
 );
+router.use(path, shiftsRouter);
 router.get(path + "/catalog", async (_req, res, next) => {
   try {
     const restaurantId = res.locals.restaurantId as string;
@@ -92,6 +95,7 @@ router.get(path + "/catalog", async (_req, res, next) => {
 });
 const orderInput = z.object({
   requestId: z.uuid(),
+  shiftId: z.uuid().nullable().default(null),
   branchId: z.uuid().nullable(),
   items: z
     .array(z.object({ id: z.uuid(), qty: z.number().int().min(1).max(999) }))
@@ -141,6 +145,21 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
           ),
         );
       if (previous) return previous;
+      const [shift] = await tx
+        .select()
+        .from(posShiftsTable)
+        .where(
+          and(
+            eq(posShiftsTable.restaurantId, restaurantId),
+            eq(posShiftsTable.userId, req.user!.id),
+            isNull(posShiftsTable.closedAt),
+            b.shiftId ? eq(posShiftsTable.id, b.shiftId) : undefined,
+          ),
+        )
+        .for("update");
+      if (!shift) throw Error("افتح وردية قبل تسجيل البيع");
+      if (shift.branchId !== b.branchId)
+        throw Error("فرع الطلب مختلف عن فرع الوردية");
       const branches = await tx
         .select()
         .from(branchesTable)
@@ -176,6 +195,7 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
           branchId: b.branchId,
           createdBy: req.user!.id,
           requestId: b.requestId,
+          shiftId: shift.id,
           items: result.lines,
           ...settlement,
           payment: b.payment,
@@ -209,6 +229,8 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
         "كمية غير صالحة",
         "قيمة الطلب تتجاوز الحد",
         "أضف أصنافًا للطلب",
+        "افتح وردية قبل تسجيل البيع",
+        "فرع الطلب مختلف عن فرع الوردية",
         "الخصم يجب ألا يتجاوز قيمة الطلب",
         "أدخل جزء البطاقة أكبر من صفر وأقل من الإجمالي",
         "الخصم متاح للمدير فقط",
@@ -254,6 +276,20 @@ router.post(
         if (!canVoidOrder(access, order))
           return { status: 403, error: "لا يمكنك إلغاء طلب موظف آخر" };
         if (order.status === "voided") return { status: 200, order };
+        if (order.shiftId) {
+          const [shift] = await tx
+            .select()
+            .from(posShiftsTable)
+            .where(
+              and(
+                eq(posShiftsTable.id, order.shiftId),
+                eq(posShiftsTable.restaurantId, access.restaurantId),
+              ),
+            )
+            .for("update");
+          if (!shift || shift.closedAt)
+            return { status: 409, error: "لا يمكن إلغاء طلب من وردية مغلقة" };
+        }
         const [updated] = await tx
           .update(posOrdersTable)
           .set({

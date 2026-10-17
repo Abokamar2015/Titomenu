@@ -8,6 +8,7 @@ import {
 } from "@/lib/supabase";
 import { LoginScreen } from "./AdminPage";
 import "./pos.css";
+import ShiftPanel, { type PosShift, type ShiftSummary } from "./ShiftPanel";
 import { toast } from "sonner";
 type Product = {
   id: string;
@@ -197,6 +198,13 @@ function Cashier() {
   const [discountReason, setDiscountReason] = useState("");
   const [cashValue, setCashValue] = useState("");
   const [cardValue, setCardValue] = useState("");
+  const [activeShift, setActiveShift] = useState<PosShift | null>(null);
+  const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null);
+  const [shiftHistory, setShiftHistory] = useState<PosShift[]>([]);
+  const [shiftLoading, setShiftLoading] = useState(true);
+  const [allShifts, setAllShifts] = useState(false);
+  const shiftOpenRequest = useRef<string | null>(null);
+  const shiftBusyRef = useRef(false);
   const [access, setAccess] = useState<Access | null>(null);
   const [held, setHeld] = useState<HeldOrder[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -240,7 +248,88 @@ function Cashier() {
     void catalog();
   }, []);
   useEffect(() => {
-    if (tab === "sale") return;
+    void loadShifts();
+  }, [allShifts]);
+  async function loadShifts() {
+    setShiftLoading(true);
+    try {
+      const j = await api("shifts" + (allShifts ? "?all=1" : ""));
+      setActiveShift(j.active);
+      setShiftSummary(j.summary);
+      setShiftHistory(j.history);
+      if (j.active) V(j.active.branchId || "");
+    } catch (e) {
+      E((e as Error).message);
+    } finally {
+      setShiftLoading(false);
+    }
+  }
+  async function openShift(amount: number) {
+    if (shiftBusyRef.current) return false;
+    shiftBusyRef.current = true;
+    B(true);
+    E("");
+    shiftOpenRequest.current ||= crypto.randomUUID();
+    try {
+      const result = await api("shifts/open", {
+        requestId: shiftOpenRequest.current,
+        branchId: branch || null,
+        openingMinor: amount,
+      });
+      setActiveShift(result);
+      V(result.branchId || "");
+      shiftOpenRequest.current = null;
+      await loadShifts();
+      toast.success(text("تم فتح الوردية", "Shift opened"));
+      return true;
+    } catch (e) {
+      E((e as Error).message);
+      return false;
+    } finally {
+      B(false);
+      shiftBusyRef.current = false;
+    }
+  }
+  async function closeShift(amount: number, note: string) {
+    if (!activeShift || shiftBusyRef.current) return false;
+    if (lines.length) {
+      E(
+        text(
+          "احفظ الطلب الحالي أو علّقه أو ألغِه قبل إغلاق الوردية",
+          "Save, hold or cancel the current order before closing the shift",
+        ),
+      );
+      return false;
+    }
+    shiftBusyRef.current = true;
+    B(true);
+    E("");
+    try {
+      const result = await api(`shifts/${activeShift.id}/close`, {
+        countedMinor: amount,
+        note,
+      });
+      setActiveShift(null);
+      setShiftSummary(null);
+      await loadShifts();
+      toast.success(
+        text(
+          "تم إغلاق الوردية. فرق الصندوق: ",
+          "Shift closed. Cash variance: ",
+        ) + money(result.varianceMinor),
+      );
+      return true;
+    } catch (e) {
+      E((e as Error).message);
+      return false;
+    } finally {
+      B(false);
+      shiftBusyRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "orders") return;
     let cancelled = false;
     L(true);
     api(`orders?date=${date}${branch ? "&branchId=" + branch : ""}`)
@@ -516,6 +605,7 @@ function Cashier() {
       });
       O((prev) => prev.map((x) => (x.id === o.id ? updated : x)));
       if (receipt?.id === o.id) R(updated);
+      await loadShifts();
       toast.success(
         text(
           "تم إلغاء الطلب واستبعاده من إجمالي المبيعات",
@@ -530,6 +620,16 @@ function Cashier() {
   }
   async function checkout() {
     if (inflight.current || !lines.length) return;
+    if (!activeShift || shiftLoading) {
+      E(
+        text(
+          "افتح وردية قبل تسجيل البيع",
+          "Open a shift before recording a sale",
+        ),
+      );
+      T("shifts");
+      return;
+    }
     if (discountInvalid || tenderInvalid || splitInvalid) {
       E(
         text(
@@ -555,6 +655,7 @@ function Cashier() {
     try {
       const o = await api("orders", {
         requestId: requestId.current,
+        shiftId: activeShift.id,
         discountMinor: discount,
         discountReason: discountReason.trim(),
         cashReceivedMinor: payment !== "card" ? received : null,
@@ -571,6 +672,7 @@ function Cashier() {
       Q("");
       resetTender();
       requestId.current = null;
+      await loadShifts();
     } catch (e) {
       E((e as Error).message);
     } finally {
@@ -686,6 +788,15 @@ function Cashier() {
             "\u2637 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631",
           )}
         </button>
+        <button
+          className={tab === "shifts" ? "on" : ""}
+          onClick={() => {
+            T("shifts");
+            void loadShifts();
+          }}
+        >
+          {text("◷ الورديات والصندوق", "◷ Shifts & cash drawer")}
+        </button>
         <a href={slug === DEFAULT_SLUG ? "/" : `/r/${slug}`}>
           {t(
             "\u2197 \u0645\u0646\u064A\u0648 \u0627\u0644\u0639\u0645\u0644\u0627\u0621",
@@ -701,7 +812,13 @@ function Cashier() {
         <header>
           <div>
             <small>TITO WORKSPACE / OPERATIONS</small>
-            <h1>{tab === "sale" ? t("نقطة البيع") : t("الطلبات والتقارير")}</h1>
+            <h1>
+              {tab === "shifts"
+                ? text("الورديات والصندوق", "Shifts & cash drawer")
+                : tab === "sale"
+                  ? t("نقطة البيع")
+                  : t("الطلبات والتقارير")}
+            </h1>
           </div>
           <button
             className="tito-language"
@@ -720,8 +837,9 @@ function Cashier() {
             {t("\u0627\u0644\u0641\u0631\u0639")}{" "}
             <select
               value={branch}
-              disabled={busy}
+              disabled={busy || !!activeShift}
               onChange={(e) => {
+                shiftOpenRequest.current = null;
                 V(e.target.value);
                 requestId.current = null;
               }}
@@ -749,7 +867,57 @@ function Cashier() {
             </button>
           </div>
         )}
-        {tab === "sale" ? (
+        {tab !== "shifts" && (
+          <div className="tito-shift-banner">
+            <span>
+              {activeShift
+                ? text("وردية مفتوحة", "Shift open") +
+                  " #" +
+                  activeShift.id.slice(0, 8)
+                : text(
+                    "لا توجد وردية مفتوحة. افتح وردية قبل حفظ المبيعات.",
+                    "No open shift. Open a shift before saving sales.",
+                  )}
+            </span>
+            <button
+              disabled={busy}
+              onClick={() => {
+                T("shifts");
+                void loadShifts();
+              }}
+            >
+              {activeShift
+                ? text("تفاصيل الوردية", "Shift details")
+                : text("فتح وردية", "Open shift")}
+            </button>
+          </div>
+        )}
+        {tab === "shifts" ? (
+          <ShiftPanel
+            lang={lang}
+            active={activeShift}
+            summary={shiftSummary}
+            history={shiftHistory}
+            busy={busy}
+            loading={shiftLoading}
+            manager={!!access?.manager}
+            all={allShifts}
+            onAll={setAllShifts}
+            onRefresh={() => void loadShifts()}
+            onOpen={openShift}
+            onClose={closeShift}
+            money={money}
+            toMinor={toMinor}
+            branchName={(id) => {
+              const b = branches.find((b) => b.id === id);
+              return id
+                ? lang === "en"
+                  ? b?.nameEn || b?.nameAr || id
+                  : b?.nameAr || id
+                : text("بدون فرع", "No branch");
+            }}
+          />
+        ) : tab === "sale" ? (
           <div className="tito-grid">
             <section>
               <div className="tito-toolbar">
@@ -1143,6 +1311,8 @@ function Cashier() {
                   busy ||
                   !lines.length ||
                   loading ||
+                  !activeShift ||
+                  shiftLoading ||
                   discountInvalid ||
                   tenderInvalid ||
                   splitInvalid ||
