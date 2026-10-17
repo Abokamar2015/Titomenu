@@ -14,7 +14,7 @@ import {
   login, logout, isAuthenticated, getCurrentUser,
   fetchSaStats, fetchSaRestaurants, saCreateRestaurant, saUpdateRestaurant,
   fetchRestaurantSettings, saveRestaurantSetting, uploadImageForRestaurant,
-  DEFAULT_SLUG,
+  DEFAULT_SLUG, setCurrentRestaurant,
   type SaStats, type SaRestaurant,
 } from '@/lib/supabase';
 import AccountMenu from '@/components/AccountMenu';
@@ -455,7 +455,9 @@ function RestaurantCard({ r, onEdit, onSettings, onQr, onToggle }: {
         <span className="flex items-center gap-1"><UtensilsCrossed className="w-3.5 h-3.5" />{r.item_count} صنف</span>
         {owner && <span className="flex items-center gap-1 truncate" dir="ltr"><Users className="w-3.5 h-3.5 shrink-0" />{owner.email}</span>}
       </div>
-      <div className="flex items-center gap-1.5 pt-1 border-t border-border">
+      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border">
+        <Button size="sm" disabled={!r.is_active} onClick={() => { setCurrentRestaurant(r.id, r.slug); window.location.href = '/pos'; }} className="gap-1 text-xs px-3 h-8">الكاشير</Button>
+        <Button size="sm" variant="outline" disabled={!r.is_active} onClick={() => { setCurrentRestaurant(r.id, r.slug); window.location.href = '/dashboard'; }} className="gap-1 text-xs px-3 h-8">مساحة العمل</Button>
         <Button size="sm" variant="ghost" onClick={onEdit} className="text-muted-foreground hover:text-foreground gap-1 text-xs px-2 h-8"><Pencil className="w-3.5 h-3.5" />تعديل</Button>
         <Button size="sm" variant="ghost" onClick={onSettings} className="text-muted-foreground hover:text-foreground gap-1 text-xs px-2 h-8"><Settings2 className="w-3.5 h-3.5" />إعدادات</Button>
         <Button size="sm" variant="ghost" onClick={onQr} className="text-muted-foreground hover:text-foreground gap-1 text-xs px-2 h-8"><QrCode className="w-3.5 h-3.5" />QR</Button>
