@@ -97,9 +97,16 @@ const orderInput = z.object({
     .array(z.object({ id: z.uuid(), qty: z.number().int().min(1).max(999) }))
     .min(1)
     .max(100),
-  payment: z.enum(["cash", "card"]),
+  payment: z.enum(["cash", "card", "mixed"]),
   service: z.enum(["takeaway", "dinein"]),
   note: z.string().max(300).default(""),
+  cardPaidMinor: z
+    .number()
+    .int()
+    .min(0)
+    .max(100000000)
+    .nullable()
+    .default(null),
   discountMinor: z.number().int().min(0).max(100000000).default(0),
   discountReason: z.string().trim().max(300).default(""),
   cashReceivedMinor: z
@@ -203,6 +210,7 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
         "قيمة الطلب تتجاوز الحد",
         "أضف أصنافًا للطلب",
         "الخصم يجب ألا يتجاوز قيمة الطلب",
+        "أدخل جزء البطاقة أكبر من صفر وأقل من الإجمالي",
         "الخصم متاح للمدير فقط",
         "أدخل سبب الخصم (3 أحرف على الأقل)",
         "المبلغ المستلم أقل من الإجمالي أو غير صالح",

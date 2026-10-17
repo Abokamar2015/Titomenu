@@ -41,7 +41,8 @@ export function calculateSettlement(
   input: {
     discountMinor: number;
     discountReason: string;
-    payment: "cash" | "card";
+    payment: "cash" | "card" | "mixed";
+    cardPaidMinor?: number | null;
     cashReceivedMinor: number | null;
   },
   manager: boolean,
@@ -55,12 +56,27 @@ export function calculateSettlement(
   if (discount > 0 && input.discountReason.trim().length < 3)
     throw Error("أدخل سبب الخصم (3 أحرف على الأقل)");
   const total = subtotal - discount;
+  const cardPaid =
+    input.payment === "card"
+      ? total
+      : input.payment === "cash"
+        ? 0
+        : input.cardPaidMinor;
+  if (
+    cardPaid == null ||
+    !Number.isSafeInteger(cardPaid) ||
+    cardPaid < 0 ||
+    cardPaid > total ||
+    (input.payment === "mixed" && (cardPaid === 0 || cardPaid === total))
+  )
+    throw Error("أدخل جزء البطاقة أكبر من صفر وأقل من الإجمالي");
+  const cashDue = total - cardPaid;
   const received =
-    input.payment === "cash" ? (input.cashReceivedMinor ?? total) : null;
+    input.payment !== "card" ? (input.cashReceivedMinor ?? cashDue) : null;
   if (
     received !== null &&
     (!Number.isSafeInteger(received) ||
-      received < total ||
+      received < cashDue ||
       received > 100000000)
   )
     throw Error("المبلغ المستلم أقل من الإجمالي أو غير صالح");
@@ -70,5 +86,6 @@ export function calculateSettlement(
     discountReason: discount > 0 ? input.discountReason.trim() : "",
     totalMinor: total,
     cashReceivedMinor: received,
+    cardPaidMinor: cardPaid,
   };
 }

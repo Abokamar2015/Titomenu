@@ -102,3 +102,74 @@ test("full manager discount may produce a zero total", () =>
     ).totalMinor,
     0,
   ));
+
+test("split payment preserves net sales and computes change from the cash portion", () => {
+  const s = calculateSettlement(
+    4500,
+    {
+      ...settlementInput,
+      payment: "mixed",
+      cardPaidMinor: 2500,
+      cashReceivedMinor: 2000,
+    },
+    true,
+  );
+  assert.equal(s.totalMinor, 4000);
+  assert.equal(s.cardPaidMinor, 2500);
+  const cashApplied = s.totalMinor - s.cardPaidMinor;
+  assert.equal(cashApplied, 1500);
+  assert.equal(s.cashReceivedMinor! - cashApplied, 500);
+  assert.equal(cashApplied + s.cardPaidMinor, s.totalMinor);
+});
+test("split payment rejects empty, zero, full, excessive, negative and fractional card parts", () => {
+  for (const cardPaidMinor of [null, 0, 4000, 4001, -1, 0.5])
+    assert.throws(() =>
+      calculateSettlement(
+        4500,
+        { ...settlementInput, payment: "mixed", cardPaidMinor },
+        true,
+      ),
+    );
+});
+test("split payment rejects insufficient cash and defaults blank received to exact cash due", () => {
+  assert.throws(() =>
+    calculateSettlement(
+      4500,
+      {
+        ...settlementInput,
+        payment: "mixed",
+        cardPaidMinor: 2500,
+        cashReceivedMinor: 1499,
+      },
+      true,
+    ),
+  );
+  assert.equal(
+    calculateSettlement(
+      4500,
+      {
+        ...settlementInput,
+        payment: "mixed",
+        cardPaidMinor: 2500,
+        cashReceivedMinor: null,
+      },
+      true,
+    ).cashReceivedMinor,
+    1500,
+  );
+});
+test("full cash and full card allocate the whole total to only one method", () => {
+  const cash = calculateSettlement(
+    4500,
+    { ...settlementInput, payment: "cash", cardPaidMinor: 1200 },
+    true,
+  );
+  const card = calculateSettlement(
+    4500,
+    { ...settlementInput, payment: "card", cardPaidMinor: 1200 },
+    true,
+  );
+  assert.equal(cash.cardPaidMinor, 0);
+  assert.equal(card.cardPaidMinor, 4000);
+  assert.equal(card.cashReceivedMinor, null);
+});

@@ -724,6 +724,21 @@
   padding: 8px;
   border-radius: 8px;
 }
+
+.tito-split {
+  margin: 10px 0;
+  padding: 10px;
+  background: #e9f4f0;
+  border-radius: 8px;
+}
+.tito-split input {
+  width: 100%;
+  margin-top: 6px;
+}
+.tito-cart .tito-switch button {
+  min-width: 0;
+  white-space: normal;
+}
 @media print {
   .tito-side,
   .tito-main,

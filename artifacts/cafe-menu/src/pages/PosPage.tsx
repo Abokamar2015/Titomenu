@@ -37,6 +37,7 @@ type Order = {
   discountMinor: number;
   discountReason: string;
   cashReceivedMinor: number | null;
+  cardPaidMinor: number | null;
   status: string;
   createdBy: string | null;
   voidReason: string | null;
@@ -195,6 +196,7 @@ function Cashier() {
   const [discountValue, setDiscountValue] = useState("");
   const [discountReason, setDiscountReason] = useState("");
   const [cashValue, setCashValue] = useState("");
+  const [cardValue, setCardValue] = useState("");
   const [access, setAccess] = useState<Access | null>(null);
   const [held, setHeld] = useState<HeldOrder[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -276,7 +278,7 @@ function Cashier() {
                   x.cart &&
                   typeof x.cart === "object" &&
                   typeof x.note === "string" &&
-                  ["cash", "card"].includes(x.payment) &&
+                  ["cash", "card", "mixed"].includes(x.payment) &&
                   ["takeaway", "dinein"].includes(x.service) &&
                   typeof x.branch === "string" &&
                   typeof x.created === "string",
@@ -310,10 +312,18 @@ function Cashier() {
     discount = access?.manager ? toMinor(discountValue) : 0,
     discountInvalid = !Number.isFinite(discount) || discount > subtotal,
     total = Math.max(0, subtotal - (Number.isFinite(discount) ? discount : 0)),
-    received = cashValue.trim() ? toMinor(cashValue) : total,
+    cardPaid =
+      payment === "card" ? total : payment === "mixed" ? toMinor(cardValue) : 0,
+    splitInvalid =
+      payment === "mixed" &&
+      (!Number.isFinite(cardPaid) || cardPaid <= 0 || cardPaid >= total),
+    cashDue = Math.max(0, total - (Number.isFinite(cardPaid) ? cardPaid : 0)),
+    received = cashValue.trim() ? toMinor(cashValue) : cashDue,
     tenderInvalid =
-      payment === "cash" &&
-      (!Number.isFinite(received) || received < total || received > 100000000),
+      payment !== "card" &&
+      (!Number.isFinite(received) ||
+        received < cashDue ||
+        received > 100000000),
     sum = paidOrders.reduce((s, o) => s + o.totalMinor, 0);
   function toMinor(value: string) {
     const normalized = value
@@ -330,6 +340,7 @@ function Cashier() {
     setDiscountValue("");
     setDiscountReason("");
     setCashValue("");
+    setCardValue("");
   }
   function change(id: string, delta: number) {
     if (inflight.current) return;
@@ -519,7 +530,7 @@ function Cashier() {
   }
   async function checkout() {
     if (inflight.current || !lines.length) return;
-    if (discountInvalid || tenderInvalid) {
+    if (discountInvalid || tenderInvalid || splitInvalid) {
       E(
         text(
           "تحقق من الخصم والمبلغ المستلم",
@@ -546,7 +557,8 @@ function Cashier() {
         requestId: requestId.current,
         discountMinor: discount,
         discountReason: discountReason.trim(),
-        cashReceivedMinor: payment === "cash" ? received : null,
+        cashReceivedMinor: payment !== "card" ? received : null,
+        cardPaidMinor: cardPaid,
         branchId: branch || null,
         items: lines.map((x) => ({ id: x.id, qty: x.qty })),
         payment,
@@ -566,6 +578,23 @@ function Cashier() {
       inflight.current = false;
     }
   }
+  function cardPart(o: Order) {
+    return o.payment === "card"
+      ? o.totalMinor
+      : o.payment === "mixed"
+        ? o.cardPaidMinor || 0
+        : 0;
+  }
+  function cashPart(o: Order) {
+    return o.totalMinor - cardPart(o);
+  }
+  function paymentLabel(method: string) {
+    return method === "mixed"
+      ? text("نقدي + بطاقة", "Cash + card")
+      : method === "cash"
+        ? t("نقدي")
+        : t("بطاقة");
+  }
   function exportCsv() {
     const rows = [
       [
@@ -575,6 +604,8 @@ function Cashier() {
         t("الإجمالي ر.س"),
         text("الحالة", "Status"),
         text("سبب الإلغاء", "Void reason"),
+        text("الجزء النقدي ر.س", "Cash portion SAR"),
+        text("جزء البطاقة ر.س", "Card portion SAR"),
         text("قبل الخصم ر.س", "Subtotal SAR"),
         text("الخصم ر.س", "Discount SAR"),
         text("سبب الخصم", "Discount reason"),
@@ -584,10 +615,12 @@ function Cashier() {
       ...orders.map((o) => [
         o.id,
         o.createdAt,
-        o.payment === "cash" ? t("نقدي") : t("بطاقة"),
+        paymentLabel(o.payment),
         (o.totalMinor / 100).toFixed(2),
         o.status === "voided" ? text("ملغى", "Voided") : text("مدفوع", "Paid"),
         o.voidReason || "",
+        (cashPart(o) / 100).toFixed(2),
+        (cardPart(o) / 100).toFixed(2),
         ((o.subtotalMinor ?? o.totalMinor) / 100).toFixed(2),
         ((o.discountMinor || 0) / 100).toFixed(2),
         o.discountReason || "",
@@ -596,7 +629,7 @@ function Cashier() {
           : (o.cashReceivedMinor / 100).toFixed(2),
         o.cashReceivedMinor === null
           ? ""
-          : ((o.cashReceivedMinor - o.totalMinor) / 100).toFixed(2),
+          : ((o.cashReceivedMinor - cashPart(o)) / 100).toFixed(2),
       ]),
     ];
     const url = URL.createObjectURL(
@@ -980,7 +1013,40 @@ function Cashier() {
                     )}
                   </details>
                 )}
-                {payment === "cash" && (
+                {payment === "mixed" && (
+                  <div className="tito-split">
+                    <label>
+                      {text(
+                        "المبلغ المحصل بالبطاقة (ر.س)",
+                        "Amount collected by card (SAR)",
+                      )}
+                      <input
+                        inputMode="decimal"
+                        disabled={busy}
+                        value={cardValue}
+                        placeholder="0.00"
+                        onChange={(e) => {
+                          setCardValue(e.target.value);
+                          requestId.current = null;
+                        }}
+                      />
+                    </label>
+                    {splitInvalid ? (
+                      <p className="tito-status-void">
+                        {text(
+                          "أدخل جزء البطاقة أكبر من صفر وأقل من الإجمالي",
+                          "Card portion must be above zero and below the total",
+                        )}
+                      </p>
+                    ) : (
+                      <p className="tito-status-paid">
+                        {text("المطلوب نقدًا: ", "Cash due: ")}
+                        {money(cashDue)} {t("ر.س")}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {payment !== "card" && (
                   <details className="tito-adjustment">
                     <summary>
                       {text("المبلغ المستلم والباقي", "Cash received & change")}
@@ -994,7 +1060,7 @@ function Cashier() {
                         disabled={busy}
                         inputMode="decimal"
                         value={cashValue}
-                        placeholder={(total / 100).toFixed(2)}
+                        placeholder={(cashDue / 100).toFixed(2)}
                         onChange={(e) => {
                           setCashValue(e.target.value);
                           requestId.current = null;
@@ -1031,18 +1097,22 @@ function Cashier() {
                   {t("\u0631.\u0633")}
                 </strong>
               </div>
-              {payment === "cash" && !tenderInvalid && cashValue.trim() && (
-                <div className="tito-change">
-                  <span>{text("الباقي للعميل", "Change due")}</span>
-                  <strong>
-                    {money(received - total)} {t("ر.س")}
-                  </strong>
-                </div>
-              )}
+              {payment !== "card" &&
+                !tenderInvalid &&
+                !splitInvalid &&
+                cashValue.trim() && (
+                  <div className="tito-change">
+                    <span>{text("الباقي للعميل", "Change due")}</span>
+                    <strong>
+                      {money(received - cashDue)} {t("ر.س")}
+                    </strong>
+                  </div>
+                )}
               <div className="tito-switch">
                 {[
                   ["cash", t("نقدي")],
                   ["card", t("بطاقة")],
+                  ["mixed", text("تقسيم الدفع", "Split payment")],
                 ].map(([id, label]) => (
                   <button
                     disabled={busy}
@@ -1061,7 +1131,7 @@ function Cashier() {
                 {t(
                   "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629 \u0645\u0646 \u0627\u0644\u0645\u0646\u064A\u0648. \u0625\u064A\u0635\u0627\u0644 \u063A\u064A\u0631 \u0636\u0631\u064A\u0628\u064A.",
                 )}{" "}
-                {payment === "card"
+                {payment !== "cash"
                   ? t(
                       "حصّل المبلغ بجهاز الدفع أولاً؛ الموقع لا يخصم من البطاقة.",
                     )
@@ -1075,6 +1145,7 @@ function Cashier() {
                   loading ||
                   discountInvalid ||
                   tenderInvalid ||
+                  splitInvalid ||
                   (discount > 0 && discountReason.trim().length < 3)
                 }
                 onClick={checkout}
@@ -1135,11 +1206,15 @@ function Cashier() {
                 ],
                 [
                   t("المبيعات النقدية"),
-                  money(
-                    paidOrders
-                      .filter((o) => o.payment === "cash")
-                      .reduce((s, o) => s + o.totalMinor, 0),
-                  ) + t(" ر.س"),
+                  money(paidOrders.reduce((sum, o) => sum + cashPart(o), 0)) +
+                    " " +
+                    t("ر.س"),
+                ],
+                [
+                  text("مبيعات البطاقة", "Card sales"),
+                  money(paidOrders.reduce((sum, o) => sum + cardPart(o), 0)) +
+                    " " +
+                    t("ر.س"),
                 ],
               ].map(([label, v]) => (
                 <div key={label}>
@@ -1203,7 +1278,7 @@ function Cashier() {
                         <td>
                           {o.service === "dinein" ? t("محلي") : t("سفري")}
                         </td>
-                        <td>{o.payment === "cash" ? t("نقدي") : t("بطاقة")}</td>
+                        <td>{paymentLabel(o.payment)}</td>
                         <td>
                           {money(o.totalMinor)}
                           {t("\u0631.\u0633")}
@@ -1354,12 +1429,27 @@ function Cashier() {
               <strong>{money(receipt.totalMinor)}</strong>
             </div>
             <p>
-              {receipt.payment === "cash"
-                ? t("نقدي")
-                : t("بطاقة — تحصيل خارجي")}{" "}
-              · {receipt.service === "dinein" ? t("محلي") : t("سفري")}
+              {paymentLabel(receipt.payment)} ·{" "}
+              {receipt.service === "dinein" ? t("محلي") : t("سفري")}
             </p>
-            {receipt.payment === "cash" &&
+            {receipt.payment === "mixed" && (
+              <>
+                <div className="tito-receipt-line">
+                  <span>{text("الجزء النقدي", "Cash portion")}</span>
+                  <b>{money(cashPart(receipt))}</b>
+                </div>
+                <div className="tito-receipt-line">
+                  <span>
+                    {text(
+                      "جزء البطاقة — تحصيل خارجي",
+                      "Card portion — paid externally",
+                    )}
+                  </span>
+                  <b>{money(cardPart(receipt))}</b>
+                </div>
+              </>
+            )}
+            {receipt.payment !== "card" &&
               receipt.cashReceivedMinor != null && (
                 <>
                   <div className="tito-receipt-line">
@@ -1369,7 +1459,7 @@ function Cashier() {
                   <div className="tito-receipt-line">
                     <span>{text("الباقي", "Change")}</span>
                     <b>
-                      {money(receipt.cashReceivedMinor - receipt.totalMinor)}
+                      {money(receipt.cashReceivedMinor - cashPart(receipt))}
                     </b>
                   </div>
                 </>
