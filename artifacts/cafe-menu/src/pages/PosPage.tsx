@@ -33,6 +33,10 @@ type HeldOrder = {
   created: string;
 };
 type Order = {
+  subtotalMinor: number | null;
+  discountMinor: number;
+  discountReason: string;
+  cashReceivedMinor: number | null;
   status: string;
   createdBy: string | null;
   voidReason: string | null;
@@ -188,6 +192,9 @@ function Cashier() {
     [busy, B] = useState(false),
     [loading, L] = useState(true),
     [receipt, R] = useState<Order | null>(null);
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [cashValue, setCashValue] = useState("");
   const [access, setAccess] = useState<Access | null>(null);
   const [held, setHeld] = useState<HeldOrder[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -299,8 +306,31 @@ function Cashier() {
   const lines = Object.entries(cart)
       .map(([id, qty]) => ({ ...products.find((p) => p.id === id)!, qty }))
       .filter((x) => x.id),
-    total = lines.reduce((s, x) => s + Math.round(x.price * 100) * x.qty, 0),
+    subtotal = lines.reduce((s, x) => s + Math.round(x.price * 100) * x.qty, 0),
+    discount = access?.manager ? toMinor(discountValue) : 0,
+    discountInvalid = !Number.isFinite(discount) || discount > subtotal,
+    total = Math.max(0, subtotal - (Number.isFinite(discount) ? discount : 0)),
+    received = cashValue.trim() ? toMinor(cashValue) : total,
+    tenderInvalid =
+      payment === "cash" &&
+      (!Number.isFinite(received) || received < total || received > 100000000),
     sum = paidOrders.reduce((s, o) => s + o.totalMinor, 0);
+  function toMinor(value: string) {
+    const normalized = value
+      .trim()
+      .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
+      .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
+      .replace(/[٫,]/g, ".");
+    if (!normalized) return 0;
+    if (!/^\d+(\.\d{0,2})?$/.test(normalized)) return NaN;
+    const n = Math.round(Number(normalized) * 100);
+    return Number.isSafeInteger(n) ? n : NaN;
+  }
+  function resetTender() {
+    setDiscountValue("");
+    setDiscountReason("");
+    setCashValue("");
+  }
   function change(id: string, delta: number) {
     if (inflight.current) return;
     requestId.current = null;
@@ -327,6 +357,7 @@ function Cashier() {
       return;
     C({});
     Q("");
+    resetTender();
     requestId.current = null;
   }
   function storeHeld(next: HeldOrder[]) {
@@ -361,6 +392,7 @@ function Cashier() {
       ]);
       C({});
       Q("");
+      resetTender();
       requestId.current = null;
       setCartOpen(false);
       toast.success(
@@ -417,6 +449,7 @@ function Cashier() {
     }
     C(valid);
     Q(h.note);
+    resetTender();
     G(h.service);
     Y(h.payment);
     V(h.branch);
@@ -486,6 +519,24 @@ function Cashier() {
   }
   async function checkout() {
     if (inflight.current || !lines.length) return;
+    if (discountInvalid || tenderInvalid) {
+      E(
+        text(
+          "تحقق من الخصم والمبلغ المستلم",
+          "Check the discount and cash received",
+        ),
+      );
+      return;
+    }
+    if (discount > 0 && discountReason.trim().length < 3) {
+      E(
+        text(
+          "أدخل سبب الخصم (3 أحرف على الأقل)",
+          "Enter a discount reason (at least 3 characters)",
+        ),
+      );
+      return;
+    }
     inflight.current = true;
     B(true);
     E("");
@@ -493,6 +544,9 @@ function Cashier() {
     try {
       const o = await api("orders", {
         requestId: requestId.current,
+        discountMinor: discount,
+        discountReason: discountReason.trim(),
+        cashReceivedMinor: payment === "cash" ? received : null,
         branchId: branch || null,
         items: lines.map((x) => ({ id: x.id, qty: x.qty })),
         payment,
@@ -503,6 +557,7 @@ function Cashier() {
       setCartOpen(false);
       C({});
       Q("");
+      resetTender();
       requestId.current = null;
     } catch (e) {
       E((e as Error).message);
@@ -520,6 +575,11 @@ function Cashier() {
         t("الإجمالي ر.س"),
         text("الحالة", "Status"),
         text("سبب الإلغاء", "Void reason"),
+        text("قبل الخصم ر.س", "Subtotal SAR"),
+        text("الخصم ر.س", "Discount SAR"),
+        text("سبب الخصم", "Discount reason"),
+        text("المستلم نقدًا ر.س", "Cash received SAR"),
+        text("الباقي ر.س", "Change SAR"),
       ],
       ...orders.map((o) => [
         o.id,
@@ -528,6 +588,15 @@ function Cashier() {
         (o.totalMinor / 100).toFixed(2),
         o.status === "voided" ? text("ملغى", "Voided") : text("مدفوع", "Paid"),
         o.voidReason || "",
+        ((o.subtotalMinor ?? o.totalMinor) / 100).toFixed(2),
+        ((o.discountMinor || 0) / 100).toFixed(2),
+        o.discountReason || "",
+        o.cashReceivedMinor === null
+          ? ""
+          : (o.cashReceivedMinor / 100).toFixed(2),
+        o.cashReceivedMinor === null
+          ? ""
+          : ((o.cashReceivedMinor - o.totalMinor) / 100).toFixed(2),
       ]),
     ];
     const url = URL.createObjectURL(
@@ -856,19 +925,103 @@ function Cashier() {
                   </div>
                 ))}
               </div>
-              <label>
-                {t("\u0645\u0644\u0627\u062D\u0638\u0627\u062A")}
-                <input
-                  disabled={busy}
-                  placeholder={t("رقم الطاولة / ملاحظات التحضير")}
-                  maxLength={300}
-                  value={note}
-                  onChange={(e) => {
-                    Q(e.target.value);
-                    requestId.current = null;
-                  }}
-                />
-              </label>
+              <div className="tito-cart-form">
+                <label>
+                  {t("\u0645\u0644\u0627\u062D\u0638\u0627\u062A")}
+                  <input
+                    disabled={busy}
+                    placeholder={t("رقم الطاولة / ملاحظات التحضير")}
+                    maxLength={300}
+                    value={note}
+                    onChange={(e) => {
+                      Q(e.target.value);
+                      requestId.current = null;
+                    }}
+                  />
+                </label>
+                {access?.manager && (
+                  <details className="tito-adjustment">
+                    <summary>
+                      {text("خصم المدير", "Manager discount")}
+                      {discount > 0 ? " · " + money(discount) : ""}
+                    </summary>
+                    <label>
+                      {text("قيمة الخصم (ر.س)", "Discount amount (SAR)")}
+                      <input
+                        inputMode="decimal"
+                        disabled={busy}
+                        value={discountValue}
+                        placeholder="0.00"
+                        onChange={(e) => {
+                          setDiscountValue(e.target.value);
+                          requestId.current = null;
+                        }}
+                      />
+                    </label>
+                    <label>
+                      {text("سبب الخصم", "Discount reason")}
+                      <input
+                        maxLength={300}
+                        disabled={busy}
+                        value={discountReason}
+                        onChange={(e) => {
+                          setDiscountReason(e.target.value);
+                          requestId.current = null;
+                        }}
+                      />
+                    </label>
+                    {discountInvalid && (
+                      <p className="tito-status-void">
+                        {text(
+                          "الخصم غير صالح أو يتجاوز قيمة الطلب",
+                          "Invalid discount or amount exceeds subtotal",
+                        )}
+                      </p>
+                    )}
+                  </details>
+                )}
+                {payment === "cash" && (
+                  <details className="tito-adjustment">
+                    <summary>
+                      {text("المبلغ المستلم والباقي", "Cash received & change")}
+                    </summary>
+                    <label>
+                      {text(
+                        "المستلم (ر.س) — اتركه فارغًا للمبلغ بالضبط",
+                        "Cash received (SAR) — blank means exact payment",
+                      )}
+                      <input
+                        disabled={busy}
+                        inputMode="decimal"
+                        value={cashValue}
+                        placeholder={(total / 100).toFixed(2)}
+                        onChange={(e) => {
+                          setCashValue(e.target.value);
+                          requestId.current = null;
+                        }}
+                      />
+                    </label>
+                    {tenderInvalid && (
+                      <p className="tito-status-void">
+                        {text(
+                          "المبلغ المستلم أقل من الإجمالي أو غير صالح",
+                          "Cash received is insufficient or invalid",
+                        )}
+                      </p>
+                    )}
+                  </details>
+                )}
+              </div>
+              {discount > 0 && !discountInvalid && (
+                <div className="tito-amount-row">
+                  <span>
+                    {text("قبل الخصم", "Subtotal")} {money(subtotal)}
+                  </span>
+                  <span>
+                    {text("خصم", "Discount")} −{money(discount)}
+                  </span>
+                </div>
+              )}
               <div className="tito-total">
                 <span>
                   {t("\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A")}
@@ -878,6 +1031,14 @@ function Cashier() {
                   {t("\u0631.\u0633")}
                 </strong>
               </div>
+              {payment === "cash" && !tenderInvalid && cashValue.trim() && (
+                <div className="tito-change">
+                  <span>{text("الباقي للعميل", "Change due")}</span>
+                  <strong>
+                    {money(received - total)} {t("ر.س")}
+                  </strong>
+                </div>
+              )}
               <div className="tito-switch">
                 {[
                   ["cash", t("نقدي")],
@@ -908,7 +1069,14 @@ function Cashier() {
               </p>
               <button
                 className="tito-primary"
-                disabled={busy || !lines.length || loading}
+                disabled={
+                  busy ||
+                  !lines.length ||
+                  loading ||
+                  discountInvalid ||
+                  tenderInvalid ||
+                  (discount > 0 && discountReason.trim().length < 3)
+                }
                 onClick={checkout}
               >
                 {busy ? t("جارٍ حفظ الطلب…") : t("تأكيد التحصيل وحفظ الطلب ←")}
@@ -948,6 +1116,17 @@ function Cashier() {
               {[
                 [t("إجمالي المبيعات"), money(sum) + t(" ر.س")],
                 [t("عدد الطلبات"), paidOrders.length],
+                [
+                  text("إجمالي الخصومات", "Total discounts"),
+                  money(
+                    paidOrders.reduce(
+                      (sum, o) => sum + (o.discountMinor || 0),
+                      0,
+                    ),
+                  ) +
+                    " " +
+                    t("ر.س"),
+                ],
                 [
                   t("متوسط الطلب"),
                   money(
@@ -1143,6 +1322,29 @@ function Cashier() {
               </div>
             ))}
             <hr />
+            {(receipt.discountMinor || 0) > 0 && (
+              <>
+                <div className="tito-receipt-line">
+                  <span>{text("قبل الخصم", "Subtotal")}</span>
+                  <b>
+                    {money(
+                      receipt.subtotalMinor ??
+                        receipt.totalMinor + receipt.discountMinor,
+                    )}
+                  </b>
+                </div>
+                <div className="tito-receipt-line">
+                  <span>{text("خصم", "Discount")}</span>
+                  <b>−{money(receipt.discountMinor)}</b>
+                </div>
+                {receipt.discountReason && (
+                  <p>
+                    {text("سبب الخصم: ", "Discount reason: ")}
+                    {receipt.discountReason}
+                  </p>
+                )}
+              </>
+            )}
             <div className="tito-receipt-line">
               <b>
                 {t(
@@ -1157,6 +1359,21 @@ function Cashier() {
                 : t("بطاقة — تحصيل خارجي")}{" "}
               · {receipt.service === "dinein" ? t("محلي") : t("سفري")}
             </p>
+            {receipt.payment === "cash" &&
+              receipt.cashReceivedMinor != null && (
+                <>
+                  <div className="tito-receipt-line">
+                    <span>{text("المبلغ المستلم", "Cash received")}</span>
+                    <b>{money(receipt.cashReceivedMinor)}</b>
+                  </div>
+                  <div className="tito-receipt-line">
+                    <span>{text("الباقي", "Change")}</span>
+                    <b>
+                      {money(receipt.cashReceivedMinor - receipt.totalMinor)}
+                    </b>
+                  </div>
+                </>
+              )}
             {receipt.note && <p>{receipt.note}</p>}
             <p>
               {t(

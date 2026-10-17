@@ -14,7 +14,7 @@ import {
   requireRestaurantRole,
   type AuthedRequest,
 } from "../lib/auth";
-import { calculateOrder } from "../pos/checkout";
+import { calculateOrder, calculateSettlement } from "../pos/checkout";
 import { canManageProducts, canVoidOrder } from "../pos/permissions";
 const router: IRouter = Router();
 const path = "/restaurants/:restaurantId/pos";
@@ -100,11 +100,24 @@ const orderInput = z.object({
   payment: z.enum(["cash", "card"]),
   service: z.enum(["takeaway", "dinein"]),
   note: z.string().max(300).default(""),
+  discountMinor: z.number().int().min(0).max(100000000).default(0),
+  discountReason: z.string().trim().max(300).default(""),
+  cashReceivedMinor: z
+    .number()
+    .int()
+    .min(0)
+    .max(100000000)
+    .nullable()
+    .default(null),
 });
 router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
   const parsed = orderInput.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "تحقق من بيانات الطلب والكميات والفرع" });
+    return;
+  }
+  if (parsed.data.discountMinor > 0 && !res.locals.posAccess.manager) {
+    res.status(403).json({ error: "الخصم متاح للمدير فقط" });
     return;
   }
   const b = parsed.data,
@@ -144,6 +157,11 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
         )
         .for("share");
       const result = calculateOrder(b.items, products);
+      const settlement = calculateSettlement(
+        result.total,
+        b,
+        res.locals.posAccess.manager,
+      );
       const [created] = await tx
         .insert(posOrdersTable)
         .values({
@@ -152,7 +170,7 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
           createdBy: req.user!.id,
           requestId: b.requestId,
           items: result.lines,
-          totalMinor: result.total,
+          ...settlement,
           payment: b.payment,
           service: b.service,
           note: b.note,
@@ -184,6 +202,10 @@ router.post(path + "/orders", async (req: AuthedRequest, res, next) => {
         "كمية غير صالحة",
         "قيمة الطلب تتجاوز الحد",
         "أضف أصنافًا للطلب",
+        "الخصم يجب ألا يتجاوز قيمة الطلب",
+        "الخصم متاح للمدير فقط",
+        "أدخل سبب الخصم (3 أحرف على الأقل)",
+        "المبلغ المستلم أقل من الإجمالي أو غير صالح",
       ].includes(e.message)
     ) {
       res.status(400).json({ error: e.message });

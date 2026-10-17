@@ -41,3 +41,64 @@ test("rejects invalid quantities, empty and excessive orders", () => {
     ),
   );
 });
+
+import { calculateSettlement } from "./checkout";
+const settlementInput = {
+  discountMinor: 500,
+  discountReason: "عرض مدير",
+  payment: "cash" as const,
+  cashReceivedMinor: 5000,
+};
+test("discount and cash change use integer minor units", () => {
+  const s = calculateSettlement(4500, settlementInput, true);
+  assert.equal(s.totalMinor, 4000);
+  assert.equal(s.cashReceivedMinor! - s.totalMinor, 1000);
+});
+test("staff cannot bypass discount permissions", () =>
+  assert.throws(() => calculateSettlement(4500, settlementInput, false)));
+test("reject over-discount, fractional discount, missing reason and insufficient cash", () => {
+  assert.throws(() =>
+    calculateSettlement(
+      4500,
+      { ...settlementInput, discountMinor: 4501 },
+      true,
+    ),
+  );
+  assert.throws(() =>
+    calculateSettlement(4500, { ...settlementInput, discountMinor: 0.5 }, true),
+  );
+  assert.throws(() =>
+    calculateSettlement(4500, { ...settlementInput, discountReason: "" }, true),
+  );
+  assert.throws(() =>
+    calculateSettlement(
+      4500,
+      { ...settlementInput, cashReceivedMinor: 3999 },
+      true,
+    ),
+  );
+});
+test("card transactions never store cash received; old clients default to exact cash", () => {
+  assert.equal(
+    calculateSettlement(4500, { ...settlementInput, payment: "card" }, true)
+      .cashReceivedMinor,
+    null,
+  );
+  assert.equal(
+    calculateSettlement(
+      4500,
+      { ...settlementInput, discountMinor: 0, cashReceivedMinor: null },
+      false,
+    ).cashReceivedMinor,
+    4500,
+  );
+});
+test("full manager discount may produce a zero total", () =>
+  assert.equal(
+    calculateSettlement(
+      4500,
+      { ...settlementInput, discountMinor: 4500, cashReceivedMinor: 0 },
+      true,
+    ).totalMinor,
+    0,
+  ));

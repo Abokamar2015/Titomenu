@@ -35,3 +35,40 @@ export function calculateOrder(
     throw Error("قيمة الطلب تتجاوز الحد");
   return { lines, total };
 }
+
+export function calculateSettlement(
+  subtotal: number,
+  input: {
+    discountMinor: number;
+    discountReason: string;
+    payment: "cash" | "card";
+    cashReceivedMinor: number | null;
+  },
+  manager: boolean,
+) {
+  const discount = input.discountMinor;
+  if (!Number.isSafeInteger(subtotal) || subtotal < 0 || subtotal > 100000000)
+    throw Error("قيمة الطلب تتجاوز الحد");
+  if (!Number.isSafeInteger(discount) || discount < 0 || discount > subtotal)
+    throw Error("الخصم يجب ألا يتجاوز قيمة الطلب");
+  if (discount > 0 && !manager) throw Error("الخصم متاح للمدير فقط");
+  if (discount > 0 && input.discountReason.trim().length < 3)
+    throw Error("أدخل سبب الخصم (3 أحرف على الأقل)");
+  const total = subtotal - discount;
+  const received =
+    input.payment === "cash" ? (input.cashReceivedMinor ?? total) : null;
+  if (
+    received !== null &&
+    (!Number.isSafeInteger(received) ||
+      received < total ||
+      received > 100000000)
+  )
+    throw Error("المبلغ المستلم أقل من الإجمالي أو غير صالح");
+  return {
+    subtotalMinor: subtotal,
+    discountMinor: discount,
+    discountReason: discount > 0 ? input.discountReason.trim() : "",
+    totalMinor: total,
+    cashReceivedMinor: received,
+  };
+}
