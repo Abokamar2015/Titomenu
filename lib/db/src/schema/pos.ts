@@ -1,0 +1,47 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  integer,
+  timestamp,
+  jsonb,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/pg-core";
+import { restaurantsTable, branchesTable } from "./restaurants";
+import { usersTable } from "./users";
+export interface PosLine {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  price_minor: number;
+  qty: number;
+}
+export const posOrdersTable = pgTable(
+  "pos_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .notNull()
+      .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+    branchId: uuid("branch_id").references(() => branchesTable.id, {
+      onDelete: "set null",
+    }),
+    createdBy: uuid("created_by").references(() => usersTable.id, {
+      onDelete: "set null",
+    }),
+    requestId: uuid("request_id").notNull(),
+    items: jsonb("items").$type<PosLine[]>().notNull(),
+    totalMinor: integer("total_minor").notNull(),
+    payment: text("payment").notNull(),
+    service: text("service").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("pos_orders_request_unique").on(t.restaurantId, t.requestId),
+    index("pos_orders_tenant_created").on(t.restaurantId, t.createdAt),
+  ],
+);

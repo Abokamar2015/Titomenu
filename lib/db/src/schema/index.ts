@@ -5,3 +5,5 @@ export * from "./menuItems";
 export * from "./categories";
 export * from "./settings";
 export * from "./gameNight";
+
+export * from "./pos";

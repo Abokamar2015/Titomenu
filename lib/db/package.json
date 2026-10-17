@@ -11,7 +11,8 @@
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "migrate:game-night": "node ./scripts/run-game-night-migrations.mjs",
-    "verify:game-night-schema": "node ./scripts/verify-game-night-schema.mjs"
+    "verify:game-night-schema": "node ./scripts/verify-game-night-schema.mjs",
+    "migrate:pos": "node ./scripts/run-pos-migrations.mjs"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
