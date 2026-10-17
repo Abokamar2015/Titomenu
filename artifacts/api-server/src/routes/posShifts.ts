@@ -4,6 +4,7 @@ import { and, eq, isNull, desc } from "drizzle-orm";
 import {
   db,
   posOrdersTable,
+  posCashMovementsTable,
   posShiftsTable,
   branchesTable,
   usersTable,
@@ -39,6 +40,18 @@ router.get("/shifts", async (req, res, next) => {
             ),
           )
       : [];
+    const movements = active
+      ? await db
+          .select()
+          .from(posCashMovementsTable)
+          .where(
+            and(
+              eq(posCashMovementsTable.restaurantId, a.restaurantId),
+              eq(posCashMovementsTable.shiftId, active.id),
+            ),
+          )
+          .orderBy(desc(posCashMovementsTable.createdAt))
+      : [];
     const history = await db
       .select({ shift: posShiftsTable, userName: usersTable.name })
       .from(posShiftsTable)
@@ -53,13 +66,13 @@ router.get("/shifts", async (req, res, next) => {
       )
       .orderBy(desc(posShiftsTable.openedAt))
       .limit(100);
-    res
-      .set("Cache-Control", "no-store")
-      .json({
-        active: active || null,
-        summary: active ? summarizeShift(active.openingMinor, rows) : null,
-        history: history.map((x) => ({ ...x.shift, userName: x.userName })),
-      });
+    res.set("Cache-Control", "no-store").json({
+      active: active || null,
+      summary: active
+        ? summarizeShift(active.openingMinor, rows, movements)
+        : null,
+      history: history.map((x) => ({ ...x.shift, userName: x.userName })),
+    });
   } catch (e) {
     next(e);
   }
@@ -168,7 +181,16 @@ router.post("/shifts/:shiftId/close", async (req, res, next) => {
             eq(posOrdersTable.shiftId, shift.id),
           ),
         );
-      const summary = summarizeShift(shift.openingMinor, orders),
+      const movements = await tx
+        .select()
+        .from(posCashMovementsTable)
+        .where(
+          and(
+            eq(posCashMovementsTable.restaurantId, a.restaurantId),
+            eq(posCashMovementsTable.shiftId, shift.id),
+          ),
+        );
+      const summary = summarizeShift(shift.openingMinor, orders, movements),
         settlement = reconcileShift(
           summary.expectedMinor,
           b.data.countedMinor,
@@ -198,6 +220,7 @@ router.post("/shifts/:shiftId/close", async (req, res, next) => {
         "أدخل تفسيرًا لفرق الصندوق (3 أحرف على الأقل)",
         "المبلغ المعدود غير صالح",
         "رصيد الصندوق يتجاوز الحد",
+        "رصيد الصندوق لا يكفي لهذه العملية",
       ].includes(e.message)
     ) {
       res.status(400).json({ error: e.message });

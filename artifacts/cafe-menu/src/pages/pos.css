@@ -786,6 +786,54 @@
   gap: 10px;
   font-size: 12px;
 }
+
+.tito-cash-movements {
+  margin: 22px 0;
+  padding: 16px;
+  border: 1px solid #dfe9e6;
+  border-radius: 12px;
+  background: #f8fcfa;
+}
+.tito-movement-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+.tito-movement-form label {
+  margin: 0;
+  font-size: 12px;
+}
+.tito-movement-form input,
+.tito-movement-form select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.tito-movement-form label:nth-child(3) {
+  grid-column: 1/-1;
+}
+.tito-cash-reason {
+  white-space: normal;
+  min-width: 130px;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+.tito-cash-reason small {
+  display: block;
+}
+.tito-receipt .tito-cash-movements {
+  padding: 8px;
+  text-align: start;
+}
+@media (max-width: 780px) {
+  .tito-movement-form {
+    grid-template-columns: 1fr;
+  }
+  .tito-movement-form label:nth-child(3) {
+    grid-column: auto;
+  }
+}
 @media print {
   .tito-side,
   .tito-main,
@@ -832,5 +880,28 @@
   }
   body:has(.tito-shifts .tito-overlay) .tito-shifts > :not(.tito-overlay) {
     display: none !important;
+  }
+}
+
+@media print {
+  .tito-cash-movements button,
+  .tito-cash-movements .tito-toolbar {
+    display: none !important;
+  }
+  .tito-cash-movements .tito-table {
+    overflow: visible;
+    padding: 0;
+  }
+  .tito-cash-movements table {
+    font-size: 8px;
+    white-space: normal;
+  }
+  .tito-cash-movements td,
+  .tito-cash-movements th {
+    padding: 3px;
+    font-size: 8px;
+  }
+  .tito-cash-movements {
+    break-before: page;
   }
 }

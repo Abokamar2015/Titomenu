@@ -291,7 +291,7 @@ function Cashier() {
     }
   }
   async function closeShift(amount: number, note: string) {
-    if (!activeShift || shiftBusyRef.current) return false;
+    if (!activeShift || shiftBusyRef.current || busy) return false;
     if (lines.length) {
       E(
         text(
@@ -895,6 +895,9 @@ function Cashier() {
         {tab === "shifts" ? (
           <ShiftPanel
             lang={lang}
+            api={api}
+            onChange={loadShifts}
+            onBusy={B}
             active={activeShift}
             summary={shiftSummary}
             history={shiftHistory}

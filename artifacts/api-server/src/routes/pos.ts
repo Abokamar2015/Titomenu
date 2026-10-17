@@ -8,6 +8,7 @@ import {
   menuItemsTable,
   posOrdersTable,
   posShiftsTable,
+  posCashMovementsTable,
   membershipsTable,
 } from "@workspace/db";
 import {
@@ -17,6 +18,8 @@ import {
 } from "../lib/auth";
 import { calculateOrder, calculateSettlement } from "../pos/checkout";
 import { canManageProducts, canVoidOrder } from "../pos/permissions";
+import { summarizeShift } from "../pos/shifts";
+import movementsRouter from "./posCashMovements";
 import shiftsRouter from "./posShifts";
 const router: IRouter = Router();
 const path = "/restaurants/:restaurantId/pos";
@@ -68,6 +71,7 @@ router.use(
   },
 );
 router.use(path, shiftsRouter);
+router.use(path, movementsRouter);
 router.get(path + "/catalog", async (_req, res, next) => {
   try {
     const restaurantId = res.locals.restaurantId as string;
@@ -289,6 +293,40 @@ router.post(
             .for("update");
           if (!shift || shift.closedAt)
             return { status: 409, error: "لا يمكن إلغاء طلب من وردية مغلقة" };
+          const refundCash =
+            order.payment === "card"
+              ? 0
+              : order.totalMinor -
+                (order.payment === "mixed" ? order.cardPaidMinor || 0 : 0);
+          if (refundCash > 0) {
+            const rows = await tx
+              .select()
+              .from(posOrdersTable)
+              .where(
+                and(
+                  eq(posOrdersTable.restaurantId, access.restaurantId),
+                  eq(posOrdersTable.shiftId, shift.id),
+                ),
+              );
+            const movements = await tx
+              .select()
+              .from(posCashMovementsTable)
+              .where(
+                and(
+                  eq(posCashMovementsTable.restaurantId, access.restaurantId),
+                  eq(posCashMovementsTable.shiftId, shift.id),
+                ),
+              );
+            if (
+              summarizeShift(shift.openingMinor, rows, movements)
+                .expectedMinor < refundCash
+            )
+              return {
+                status: 409,
+                error:
+                  "رصيد الصندوق لا يكفي لرد النقد؛ سجّل إيداعًا فعليًا أولًا",
+              };
+          }
         }
         const [updated] = await tx
           .update(posOrdersTable)

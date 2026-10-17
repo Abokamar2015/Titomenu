@@ -58,3 +58,76 @@ test("invalid payments and overflowing drawer balances cannot be reconciled", ()
   );
   assert.throws(() => summarizeShift(2000000000, [base]));
 });
+
+test("cash movements change drawer balance without changing sales", () => {
+  const s = summarizeShift(
+    10000,
+    [base],
+    [
+      { id: "a", kind: "in", amountMinor: 3000 },
+      { id: "b", kind: "out", amountMinor: 2000 },
+      { id: "c", kind: "expense", amountMinor: 500 },
+    ],
+  );
+  assert.equal(s.expectedMinor, 14500);
+  assert.equal(s.salesMinor, 4000);
+  assert.equal(s.cashInMinor, 3000);
+  assert.equal(s.cashOutMinor, 2500);
+  assert.equal(s.expenseMinor, 500);
+  assert.equal(s.movementCount, 3);
+});
+test("expense reversal restores cash and removes net expense", () => {
+  const s = summarizeShift(
+    1000,
+    [],
+    [
+      { id: "a", kind: "expense", amountMinor: 500 },
+      { id: "b", kind: "in", amountMinor: 500, reversesId: "a" },
+    ],
+  );
+  assert.equal(s.expectedMinor, 1000);
+  assert.equal(s.expenseMinor, 0);
+  assert.equal(s.cashInMinor, 500);
+  assert.equal(s.cashOutMinor, 500);
+});
+test("deposit reversal removes the deposited cash", () => {
+  const s = summarizeShift(
+    1000,
+    [],
+    [
+      { id: "a", kind: "in", amountMinor: 500 },
+      { id: "b", kind: "out", amountMinor: 500, reversesId: "a" },
+    ],
+  );
+  assert.equal(s.expectedMinor, 1000);
+});
+test("withdrawals and refunds cannot exceed available cash", () => {
+  assert.throws(() =>
+    summarizeShift(100, [], [{ id: "a", kind: "out", amountMinor: 101 }]),
+  );
+  assert.throws(() =>
+    summarizeShift(
+      0,
+      [{ ...base, status: "voided" }],
+      [{ id: "a", kind: "expense", amountMinor: 500 }],
+    ),
+  );
+});
+test("cash movements reject invalid amounts and kinds", () => {
+  for (const amountMinor of [0, -1, 1.5, 100000001])
+    assert.throws(() =>
+      summarizeShift(1000, [], [{ id: "a", kind: "in", amountMinor }]),
+    );
+  assert.throws(() =>
+    summarizeShift(1000, [], [{ id: "a", kind: "card", amountMinor: 1 }]),
+  );
+});
+test("card receipts do not fund cash withdrawals", () => {
+  assert.throws(() =>
+    summarizeShift(
+      0,
+      [{ ...base, payment: "card" }],
+      [{ id: "a", kind: "out", amountMinor: 1 }],
+    ),
+  );
+});

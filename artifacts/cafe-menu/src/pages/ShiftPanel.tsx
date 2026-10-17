@@ -1,5 +1,10 @@
+import CashMovementPanel from "./CashMovementPanel";
 import { useState } from "react";
 export type ShiftSummary = {
+  cashInMinor?: number;
+  cashOutMinor?: number;
+  expenseMinor?: number;
+  movementCount?: number;
   salesMinor: number;
   cashMinor: number;
   cardMinor: number;
@@ -39,6 +44,9 @@ export default function ShiftPanel({
   money,
   toMinor,
   branchName,
+  api,
+  onChange,
+  onBusy,
 }: {
   lang: "ar" | "en";
   active: PosShift | null;
@@ -55,6 +63,9 @@ export default function ShiftPanel({
   money: (n: number) => string;
   toMinor: (s: string) => number;
   branchName: (id: string | null) => string;
+  api: (path: string, data?: unknown) => Promise<any>;
+  onChange: () => Promise<void>;
+  onBusy: (x: boolean) => void;
 }) {
   const [opening, S] = useState(""),
     [counted, C] = useState(""),
@@ -166,6 +177,11 @@ export default function ShiftPanel({
                   summary?.cashMinor || 0,
                 ],
                 [text("مبيعات البطاقة", "Card sales"), summary?.cardMinor || 0],
+                [text("الإيداعات", "Cash in"), summary?.cashInMinor || 0],
+                [
+                  text("السحب والمصروف", "Cash out and expenses"),
+                  summary?.cashOutMinor || 0,
+                ],
                 [text("النقد المتوقع", "Expected cash"), expected],
               ].map(([label, value]) => (
                 <div key={String(label)}>
@@ -176,10 +192,21 @@ export default function ShiftPanel({
             </div>
             <p>
               {text(
-                "المتوقع = رصيد البداية + المبيعات النقدية غير الملغاة، بعد استبعاد الباقي. لا يشمل سحبًا أو إيداعًا أثناء الوردية.",
-                "Expected cash = opening balance + non-voided cash sales, excluding customer change. Mid-shift cash withdrawals and deposits are not included.",
+                "المتوقع = رصيد البداية + صافي النقد من المبيعات + الإيداعات − السحب والمصروف. الباقي وحصة البطاقة ليسا إيرادًا نقديًا للصندوق.",
+                "Expected cash = opening balance + net cash sales + cash in − cash out and expenses. Customer change and card payments are excluded from cash sales.",
               )}
             </p>
+            <CashMovementPanel
+              key={active.id}
+              lang={lang}
+              shift={active}
+              api={api}
+              onChange={onChange}
+              money={money}
+              toMinor={toMinor}
+              busy={busy}
+              onBusy={onBusy}
+            />
             <form className="tito-shift-close" onSubmit={submitClose}>
               <label>
                 {text(
@@ -344,6 +371,21 @@ export default function ShiftPanel({
                 text("الخصومات", "Discounts"),
                 selected.closingSummary?.discountMinor,
               ],
+              [
+                text("الإيداعات", "Cash in"),
+                selected.closingSummary?.cashInMinor,
+              ],
+              [
+                text("السحب والمصروف", "Cash out & expenses"),
+                selected.closingSummary?.cashOutMinor,
+              ],
+              [
+                text(
+                  "المصروف المسجل بعد التصحيح",
+                  "Recorded expenses after reversals",
+                ),
+                selected.closingSummary?.expenseMinor,
+              ],
               [text("النقد المتوقع", "Expected cash"), selected.expectedMinor],
               [text("النقد المعدود", "Counted cash"), selected.countedMinor],
               [text("الفرق", "Variance"), selected.varianceMinor],
@@ -360,6 +402,17 @@ export default function ShiftPanel({
               {selected.closingSummary?.voidedCount ?? "—"}
             </p>
             {selected.closingNote && <p>{selected.closingNote}</p>}
+            <CashMovementPanel
+              key={selected.id}
+              lang={lang}
+              shift={selected}
+              api={api}
+              onChange={onChange}
+              money={money}
+              toMinor={toMinor}
+              busy={busy}
+              onBusy={onBusy}
+            />
             <small>
               {text(
                 "تقرير تسوية داخلي، وليس فاتورة ضريبية",

@@ -5,7 +5,17 @@ export interface ShiftOrder {
   cardPaidMinor: number | null;
   discountMinor: number;
 }
-export function summarizeShift(openingMinor: number, orders: ShiftOrder[]) {
+export interface CashMovement {
+  id: string;
+  kind: string;
+  amountMinor: number;
+  reversesId?: string | null;
+}
+export function summarizeShift(
+  openingMinor: number,
+  orders: ShiftOrder[],
+  movements: CashMovement[] = [],
+) {
   if (!Number.isSafeInteger(openingMinor) || openingMinor < 0)
     throw Error("رصيد البداية غير صالح");
   let salesMinor = 0,
@@ -39,7 +49,25 @@ export function summarizeShift(openingMinor: number, orders: ShiftOrder[]) {
     discountMinor += o.discountMinor || 0;
     paidCount++;
   }
-  const expectedMinor = openingMinor + cashMinor;
+  let cashInMinor = 0,
+    cashOutMinor = 0,
+    expenseMinor = 0;
+  const reversed = new Set(movements.map((x) => x.reversesId).filter(Boolean));
+  for (const m of movements) {
+    if (
+      !Number.isSafeInteger(m.amountMinor) ||
+      m.amountMinor <= 0 ||
+      m.amountMinor > 100000000 ||
+      !["in", "out", "expense"].includes(m.kind)
+    )
+      throw Error("حركة نقد غير صالحة");
+    if (m.kind === "in") cashInMinor += m.amountMinor;
+    else cashOutMinor += m.amountMinor;
+    if (m.kind === "expense" && !reversed.has(m.id))
+      expenseMinor += m.amountMinor;
+  }
+  const expectedMinor = openingMinor + cashMinor + cashInMinor - cashOutMinor;
+  if (expectedMinor < 0) throw Error("رصيد الصندوق لا يكفي لهذه العملية");
   if (!Number.isSafeInteger(expectedMinor) || expectedMinor > 2000000000)
     throw Error("رصيد الصندوق يتجاوز الحد");
   return {
@@ -50,6 +78,10 @@ export function summarizeShift(openingMinor: number, orders: ShiftOrder[]) {
     paidCount,
     voidedCount,
     expectedMinor,
+    cashInMinor,
+    cashOutMinor,
+    expenseMinor,
+    movementCount: movements.length,
   };
 }
 export function reconcileShift(
