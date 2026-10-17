@@ -48,6 +48,10 @@ export const posShiftsTable = pgTable(
       paidCount: number;
       voidedCount: number;
       expectedMinor: number;
+      cashInMinor?: number;
+      cashOutMinor?: number;
+      expenseMinor?: number;
+      movementCount?: number;
     }>(),
   },
   (t) => [
@@ -55,6 +59,38 @@ export const posShiftsTable = pgTable(
       .on(t.restaurantId, t.userId)
       .where(sql`${t.closedAt} IS NULL`),
     index("pos_shifts_restaurant_time").on(t.restaurantId, t.openedAt),
+  ],
+);
+export const posCashMovementsTable = pgTable(
+  "pos_cash_movements",
+  {
+    id: uuid("id").primaryKey(),
+    restaurantId: uuid("restaurant_id")
+      .notNull()
+      .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+    shiftId: uuid("shift_id")
+      .notNull()
+      .references(() => posShiftsTable.id, { onDelete: "restrict" }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "restrict" }),
+    kind: text("kind").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    reason: text("reason").notNull(),
+    reversesId: uuid("reverses_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("pos_cash_movement_one_reversal")
+      .on(t.reversesId)
+      .where(sql`${t.reversesId} IS NOT NULL`),
+    index("pos_cash_movements_shift").on(
+      t.restaurantId,
+      t.shiftId,
+      t.createdAt,
+    ),
   ],
 );
 export const posOrdersTable = pgTable(
