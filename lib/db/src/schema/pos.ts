@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { restaurantsTable, branchesTable } from "./restaurants";
 import { usersTable } from "./users";
 export interface PosLine {
@@ -17,6 +18,45 @@ export interface PosLine {
   price_minor: number;
   qty: number;
 }
+export const posShiftsTable = pgTable(
+  "pos_shifts",
+  {
+    id: uuid("id").primaryKey(),
+    restaurantId: uuid("restaurant_id")
+      .notNull()
+      .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "restrict" }),
+    branchId: uuid("branch_id").references(() => branchesTable.id, {
+      onDelete: "set null",
+    }),
+    openingMinor: integer("opening_minor").notNull(),
+    openedAt: timestamp("opened_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    countedMinor: integer("counted_minor"),
+    expectedMinor: integer("expected_minor"),
+    varianceMinor: integer("variance_minor"),
+    closingNote: text("closing_note").notNull().default(""),
+    closingSummary: jsonb("closing_summary").$type<{
+      salesMinor: number;
+      cashMinor: number;
+      cardMinor: number;
+      discountMinor: number;
+      paidCount: number;
+      voidedCount: number;
+      expectedMinor: number;
+    }>(),
+  },
+  (t) => [
+    uniqueIndex("pos_shifts_one_active")
+      .on(t.restaurantId, t.userId)
+      .where(sql`${t.closedAt} IS NULL`),
+    index("pos_shifts_restaurant_time").on(t.restaurantId, t.openedAt),
+  ],
+);
 export const posOrdersTable = pgTable(
   "pos_orders",
   {
@@ -31,6 +71,9 @@ export const posOrdersTable = pgTable(
       onDelete: "set null",
     }),
     requestId: uuid("request_id").notNull(),
+    shiftId: uuid("shift_id").references(() => posShiftsTable.id, {
+      onDelete: "restrict",
+    }),
     items: jsonb("items").$type<PosLine[]>().notNull(),
     totalMinor: integer("total_minor").notNull(),
     subtotalMinor: integer("subtotal_minor"),
