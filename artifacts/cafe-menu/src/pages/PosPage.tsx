@@ -1,3 +1,4 @@
+import ReportActions from "./ReportActions";
 import DailySalesReport from "./DailySalesReport";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -1391,6 +1392,21 @@ function Cashier() {
                 )}
               </small>
             </div>
+            {access?.manager && !loading && !error && (
+              <ReportActions
+                orders={orders}
+                products={bestSellers}
+                lang={lang}
+                from={date}
+                to={toDate}
+                branch={
+                  branch
+                    ? branches.find((b) => b.id === branch)?.nameAr || branch
+                    : text("جميع الفروع", "All branches")
+                }
+                truncated={truncated}
+              />
+            )}
             {truncated && (
               <p className="tito-error">
                 {t(
