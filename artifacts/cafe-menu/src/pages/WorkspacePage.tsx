@@ -1,3 +1,4 @@
+import ManagerDashboard from "./ManagerDashboard";
 import {
   isAuthenticated,
   getCurrentUser,
@@ -15,6 +16,12 @@ export default function WorkspacePage() {
   const rid = getCurrentRestaurantId(),
     user = getCurrentUser(),
     slug = getCurrentRestaurantSlug() || DEFAULT_SLUG;
+  if (
+    rid &&
+    (user?.is_super_admin ||
+      ["owner", "manager"].includes(getCurrentMembership()?.role || ""))
+  )
+    return <ManagerDashboard />;
   return (
     <div
       dir="rtl"

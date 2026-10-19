@@ -186,7 +186,11 @@ function Cashier() {
     [cart, C] = useState<Record<string, number>>({}),
     [search, S] = useState(""),
     [category, K] = useState("__all"),
-    [tab, T] = useState("sale"),
+    [tab, T] = useState(
+      new URLSearchParams(window.location.search).get("tab") === "orders"
+        ? "orders"
+        : "sale",
+    ),
     [payment, Y] = useState("cash"),
     [service, G] = useState("takeaway"),
     [note, Q] = useState(""),
