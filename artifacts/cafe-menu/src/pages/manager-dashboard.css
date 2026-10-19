@@ -457,3 +457,36 @@
     padding: 20px 15px;
   }
 }
+
+.md-sidebar {
+  overflow-y: auto;
+}
+.md-nav-group summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 12px;
+  border-radius: 9px;
+  color: #707387;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.md-nav-group summary::-webkit-details-marker {
+  display: none;
+}
+.md-nav-group summary svg:last-child {
+  margin-inline-start: auto;
+}
+.md-nav-group[open] summary {
+  background: #faf8ff;
+  color: #7156d9;
+}
+.md-sidebar nav .md-nav-group a {
+  padding-inline-start: 42px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.md-nav-group[open] summary svg:last-child {
+  transform: rotate(180deg);
+}

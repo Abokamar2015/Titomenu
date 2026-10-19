@@ -1,3 +1,4 @@
+import ManagerSidebar from "./ManagerSidebar";
 import { useEffect, useState } from "react";
 import {
   BarChart,
@@ -11,23 +12,11 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  UtensilsCrossed,
-  FileChartColumn,
-  Users,
-  ArrowUpLeft,
-  RefreshCw,
-  Globe,
-  Menu,
-} from "lucide-react";
+import { ArrowUpLeft, RefreshCw, Globe, Menu } from "lucide-react";
 import {
   getAuthToken,
   getCurrentRestaurantId,
-  getCurrentRestaurantSlug,
   getCurrentUser,
-  DEFAULT_SLUG,
 } from "@/lib/supabase";
 import { managerMetrics, type DashboardOrder } from "./managerMetrics";
 import { reportPeriod } from "./reportPeriods";
@@ -57,8 +46,7 @@ export default function ManagerDashboard() {
     [refresh, setRefresh] = useState(0),
     [loaded, setLoaded] = useState("");
   const rid = getCurrentRestaurantId(),
-    user = getCurrentUser(),
-    slug = getCurrentRestaurantSlug() || DEFAULT_SLUG;
+    user = getCurrentUser();
   const money = (minor: number) =>
     new Intl.NumberFormat(lang === "ar" ? "ar-SA" : "en-SA", {
       minimumFractionDigits: 2,
@@ -115,43 +103,6 @@ export default function ManagerDashboard() {
       { name: text("نقدي", "Cash"), value: m.cash / 100 },
       { name: text("بطاقة", "Card"), value: m.card / 100 },
     ].filter((x) => x.value > 0);
-  const nav = [
-    {
-      name: text("المطبخ والتحضير", "Kitchen & preparation"),
-      href: "/kitchen",
-      icon: UtensilsCrossed,
-    },
-    {
-      name: text("الملخص", "Overview"),
-      href: "/dashboard",
-      icon: LayoutDashboard,
-    },
-    { name: text("الكاشير", "Cashier"), href: "/pos", icon: ShoppingCart },
-    {
-      name: text("الطلبات والتقارير", "Orders & reports"),
-      href: "/pos?tab=orders",
-      icon: FileChartColumn,
-    },
-    {
-      name: text("المنتجات والتصنيفات", "Products & categories"),
-      href: "/admin",
-      icon: UtensilsCrossed,
-    },
-    {
-      name: text("منيو العملاء", "Customer menu"),
-      href: slug === DEFAULT_SLUG ? "/" : `/r/${slug}`,
-      icon: Globe,
-    },
-    ...(user?.is_super_admin
-      ? [
-          {
-            name: text("إدارة المنصة", "Platform management"),
-            href: "/sa",
-            icon: Users,
-          },
-        ]
-      : []),
-  ];
   const empty = (
     <p className="md-empty">
       {text(
@@ -207,34 +158,7 @@ export default function ManagerDashboard() {
   }
   return (
     <div className="md-shell" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
-      <aside className={"md-sidebar " + (mobile ? "is-open" : "")}>
-        <a className="md-brand" href="/dashboard">
-          TITO<span>MANAGER CONSOLE</span>
-        </a>
-        <div className="md-workspace">
-          <small>{text("مساحة العمل", "Workspace")}</small>
-          <strong>{slug}</strong>
-        </div>
-        <nav>
-          {nav.map((n) => (
-            <a
-              key={n.href}
-              href={n.href}
-              className={n.href === "/dashboard" ? "active" : ""}
-            >
-              <n.icon size={19} />
-              {n.name}
-            </a>
-          ))}
-        </nav>
-        <a className="md-profile" href="/profile">
-          <span>{user?.name?.slice(0, 1) || "T"}</span>
-          <div>
-            <strong>{user?.name}</strong>
-            <small>{text("إعدادات حسابي", "My account settings")}</small>
-          </div>
-        </a>
-      </aside>
+      <ManagerSidebar lang={lang} active="overview" mobile={mobile} />
       <main className="md-main">
         <header className="md-topbar">
           <button

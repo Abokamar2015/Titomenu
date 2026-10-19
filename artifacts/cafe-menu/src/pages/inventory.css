@@ -1,0 +1,332 @@
+.iv-denied {
+  font: 16px Arial;
+  padding: 50px;
+}
+.iv-denied a {
+  color: #7156d9;
+}
+.iv-notice {
+  border: 1px solid #e4dfef;
+  border-radius: 10px;
+  background: #f0edfa;
+  color: #77638e;
+  font-size: 12px;
+  padding: 14px;
+  line-height: 1.8;
+  margin-bottom: 22px;
+}
+.iv-list {
+  padding: 0;
+  overflow: hidden;
+}
+.iv-list-toolbar {
+  padding: 18px 24px;
+  border-bottom: 1px solid #eef0f6;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.iv-tabs {
+  display: flex;
+  gap: 5px;
+}
+.md-shell .iv-tabs button {
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  padding: 9px 13px;
+}
+.md-shell .iv-tabs .active {
+  background: #eee8fb;
+  color: #7156d9;
+  font-weight: bold;
+}
+.iv-search {
+  display: flex;
+  gap: 10px;
+  padding: 22px 24px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.iv-search label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fafbfe;
+  border: 1px solid #e4e6ef;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #a2a6b8;
+  width: 340px;
+  max-width: 100%;
+}
+.iv-search input {
+  font: inherit;
+  border: 0;
+  background: transparent;
+  padding: 13px 0;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  color: #4b5368;
+}
+.iv-table {
+  overflow: auto;
+  min-height: 160px;
+}
+.iv-table table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: start;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.iv-table th {
+  text-align: start;
+  background: #fbfbfd;
+  border-block: 1px solid #eff0f6;
+  color: #9397aa;
+  font-weight: normal;
+  padding: 15px 21px;
+}
+.iv-table td {
+  padding: 19px 21px;
+  border-bottom: 1px solid #eff0f6;
+  color: #5f667d;
+}
+.iv-table td > b {
+  color: #3a425a;
+  font-weight: normal;
+}
+.iv-table td > small {
+  display: block;
+  font-size: 10px;
+  color: #a2a6b6;
+  margin-top: 7px;
+}
+.iv-table td > button {
+  font-size: 10px;
+  padding: 7px 10px;
+  margin-inline-end: 5px;
+}
+.iv-table tr:hover {
+  background: #fcfbff;
+}
+.iv-table .iv-empty {
+  text-align: center;
+  padding: 55px 25px;
+  color: #999fb1;
+}
+.iv-badge {
+  display: inline-block;
+  background: #f0f0f3;
+  color: #9294a4;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+}
+.iv-badge.is-active {
+  color: #31897c;
+  background: #e7f6f0;
+}
+.iv-pagination {
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  color: #9399aa;
+}
+.iv-pagination > span {
+  margin-inline-end: auto;
+}
+.iv-pagination button {
+  padding: 8px 13px;
+  font-size: 11px;
+}
+.iv-overlay {
+  position: fixed;
+  inset: 0;
+  background: #19203588;
+  z-index: 80;
+  display: flex;
+  justify-content: flex-start;
+}
+.iv-drawer {
+  background: white;
+  width: 650px;
+  max-width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 25px 30px;
+  box-shadow: 0 0 30px #12213230;
+}
+.iv-drawer header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #eceef4;
+  padding-bottom: 20px;
+  margin-bottom: 23px;
+}
+.iv-drawer h2 {
+  font-size: 21px;
+  margin: 8px 0;
+  font-weight: bold;
+}
+.iv-drawer header small {
+  color: #9395a7;
+  font-size: 11px;
+}
+.iv-drawer fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.iv-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 17px;
+}
+.iv-fields label {
+  font-size: 12px;
+  color: #676e83;
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+.iv-fields input,
+.iv-fields select,
+.iv-fields textarea {
+  border: 1px solid #dfe2ed;
+  border-radius: 7px;
+  padding: 11px 12px;
+  font: inherit;
+  background: white;
+  color: #48516a;
+  width: 100%;
+  min-width: 0;
+}
+.iv-fields input:focus,
+.iv-fields select:focus,
+.iv-fields textarea:focus {
+  outline: 2px solid #d4c5f1;
+}
+.iv-fields .iv-wide,
+.iv-fields .iv-help,
+.iv-fields .iv-checkbox {
+  grid-column: 1/-1;
+}
+.iv-help {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #999eb0;
+  margin: 0;
+}
+.iv-fields .iv-checkbox {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #f8f7fc;
+  border-radius: 9px;
+  padding: 14px;
+  line-height: 1.8;
+}
+.iv-checkbox input {
+  width: 17px;
+  height: 17px;
+  accent-color: #7156d9;
+}
+.iv-drawer > footer {
+  display: flex;
+  gap: 10px;
+  padding-top: 25px;
+  border-top: 1px solid #eceef4;
+  margin-top: 25px;
+  position: sticky;
+  bottom: -25px;
+  background: white;
+  padding-bottom: 15px;
+}
+.iv-event {
+  padding: 18px 0;
+  border-bottom: 1px solid #eef0f5;
+}
+.iv-event > b {
+  font-size: 13px;
+  color: #7156d9;
+}
+.iv-event p {
+  font-size: 11px;
+  color: #9a9fb2;
+}
+.iv-event dl {
+  margin-bottom: 0;
+  font-size: 12px;
+}
+.iv-event dl > div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  padding: 9px 0;
+}
+.iv-event dt {
+  color: #969bad;
+}
+.iv-event dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.iv-event del {
+  color: #b3a4a4;
+}
+.iv-event dd span {
+  color: #566d5d;
+}
+.iv-history {
+  z-index: 90;
+}
+@media (max-width: 600px) {
+  .iv-fields {
+    grid-template-columns: 1fr;
+  }
+  .iv-drawer {
+    padding: 20px;
+  }
+  .iv-list-toolbar,
+  .iv-search {
+    padding: 16px;
+  }
+  .iv-pagination {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .iv-pagination > span {
+    flex-basis: 100%;
+    margin-bottom: 8px;
+  }
+  .iv-table th,
+  .iv-table td {
+    padding: 14px;
+  }
+  .iv-event dl > div {
+    grid-template-columns: 90px 1fr;
+  }
+  .iv-overlay {
+    padding: 0;
+  }
+  .iv-drawer > footer {
+    bottom: -20px;
+  }
+  .iv-list-toolbar > button {
+    font-size: 11px;
+  }
+}

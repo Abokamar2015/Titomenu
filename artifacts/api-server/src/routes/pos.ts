@@ -1,3 +1,4 @@
+import inventoryMasterRouter from "./inventoryMaster";
 import kitchenRouter from "./posKitchen";
 import { salesRange } from "../pos/reports";
 import { Router, type IRouter } from "express";
@@ -72,6 +73,7 @@ router.use(
     }
   },
 );
+router.use(path + "/inventory", inventoryMasterRouter);
 router.use(path, kitchenRouter);
 router.use(path, shiftsRouter);
 router.use(path, movementsRouter);

@@ -7,3 +7,4 @@ export * from "./settings";
 export * from "./gameNight";
 
 export * from "./pos";
+export * from "./inventory";

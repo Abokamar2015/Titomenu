@@ -1,3 +1,4 @@
+import InventoryPage from "@/pages/InventoryPage";
 import KitchenPage from "@/pages/KitchenPage";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { Toaster } from "sonner";
@@ -20,6 +21,12 @@ function Router() {
       <Route path="/pos" component={PosPage} />
       <Route path="/kitchen" component={KitchenPage} />
       <Route path="/dashboard" component={WorkspacePage} />
+      <Route path="/inventory/suppliers">
+        {() => <InventoryPage kind="suppliers" />}
+      </Route>
+      <Route path="/inventory/items">
+        {() => <InventoryPage kind="items" />}
+      </Route>
       <Route path="/admin" component={AdminPage} />
       <Route path="/sa" component={SuperAdminPage} />
       <Route path="/profile" component={ProfilePage} />
