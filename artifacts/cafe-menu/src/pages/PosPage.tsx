@@ -1,3 +1,4 @@
+import DailySalesReport from "./DailySalesReport";
 import { useState, useEffect, useRef } from "react";
 import {
   getAuthToken,
@@ -1019,55 +1020,6 @@ function Cashier() {
                   ),
                 )}
               </div>
-              {access?.manager && !loading && !error && (
-                <section>
-                  <h2>
-                    {text("الأصناف الأكثر مبيعًا", "Best-selling products")}
-                  </h2>
-                  <p>
-                    {text(
-                      "القيمة قبل خصم الطلب؛ الطلبات الملغاة مستبعدة. عند تجاوز 1000 طلب، النتائج تخص أحدث 1000 فقط.",
-                      "Values before order discounts; voided orders excluded. Above 1,000 orders, results cover the latest 1,000 only.",
-                    )}
-                  </p>
-                  <div className="tito-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>{text("الصنف", "Product")}</th>
-                          <th>{text("الكمية", "Quantity")}</th>
-                          <th>{text("قبل الخصم", "Before discount")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bestSellers.map((item) => (
-                          <tr key={item.id}>
-                            <td>
-                              {lang === "ar"
-                                ? item.nameAr
-                                : item.nameEn || item.nameAr}
-                            </td>
-                            <td>{item.qty}</td>
-                            <td>
-                              {money(item.valueMinor)} {t("ر.س")}
-                            </td>
-                          </tr>
-                        ))}
-                        {!bestSellers.length && (
-                          <tr>
-                            <td colSpan={3}>
-                              {text(
-                                "لا توجد مبيعات في الفترة",
-                                "No sales in this period",
-                              )}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
               {loading ? (
                 <p>
                   {t(
@@ -1486,6 +1438,16 @@ function Cashier() {
                 </div>
               ))}
             </div>
+            {access?.manager && !loading && !error && (
+              <DailySalesReport
+                orders={orders}
+                lang={lang}
+                money={money}
+                from={date}
+                to={toDate}
+                truncated={truncated}
+              />
+            )}
             {access?.manager && !loading && !error && (
               <section>
                 <h2>
