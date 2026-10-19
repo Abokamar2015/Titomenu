@@ -1,3 +1,4 @@
+import { reportPeriod } from "./reportPeriods";
 import ReportActions from "./ReportActions";
 import DailySalesReport from "./DailySalesReport";
 import { useState, useEffect, useRef } from "react";
@@ -197,6 +198,8 @@ function Cashier() {
     [busy, B] = useState(false),
     [loading, L] = useState(true),
     [receipt, R] = useState<Order | null>(null);
+  const [reportRefresh, setReportRefresh] = useState(0);
+  const [reportLoadedAt, setReportLoadedAt] = useState<string | null>(null);
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatus, setOrderStatus] = useState("all");
   const [orderPayment, setOrderPayment] = useState("all");
@@ -344,6 +347,7 @@ function Cashier() {
       .then((j) => {
         if (!cancelled) {
           O(j.orders);
+          setReportLoadedAt(new Date().toISOString());
           U(j.truncated);
           E("");
         }
@@ -351,6 +355,8 @@ function Cashier() {
       .catch((e) => {
         if (!cancelled) {
           O([]);
+          U(false);
+          setReportLoadedAt(null);
           E(e.message);
         }
       })
@@ -360,7 +366,7 @@ function Cashier() {
     return () => {
       cancelled = true;
     };
-  }, [tab, date, toDate, branch, access?.manager]);
+  }, [tab, date, toDate, branch, access?.manager, reportRefresh]);
   useEffect(() => {
     if (!draftKey) return;
     try {
@@ -1374,6 +1380,50 @@ function Cashier() {
         ) : (
           <>
             <div className="tito-toolbar">
+              {(
+                [
+                  "today",
+                  "yesterday",
+                  ...(access?.manager ? ["week", "month"] : []),
+                ] as ("today" | "yesterday" | "week" | "month")[]
+              ).map((kind) => (
+                <button
+                  key={kind}
+                  disabled={loading}
+                  onClick={() => {
+                    const period = reportPeriod(today(), kind);
+                    D(period.from);
+                    setToDate(period.to);
+                    setReportRefresh((n) => n + 1);
+                  }}
+                >
+                  {kind === "today"
+                    ? text("اليوم", "Today")
+                    : kind === "yesterday"
+                      ? text("أمس", "Yesterday")
+                      : kind === "week"
+                        ? text("آخر 7 أيام", "Last 7 days")
+                        : text("الشهر الحالي", "This month")}
+                </button>
+              ))}
+              <button
+                disabled={loading}
+                onClick={() => setReportRefresh((n) => n + 1)}
+              >
+                {loading
+                  ? text("جارٍ التحديث…", "Refreshing…")
+                  : text("↻ تحديث الطلبات", "↻ Refresh orders")}
+              </button>
+              {reportLoadedAt && !loading && !error && (
+                <small>
+                  {text("آخر تحديث", "Last refreshed")}:{" "}
+                  {new Date(reportLoadedAt).toLocaleString(locale, {
+                    timeZone: "Asia/Riyadh",
+                  })}
+                </small>
+              )}
+            </div>
+            <div className="tito-toolbar">
               <label>
                 {t(
                   "\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A",
@@ -1381,7 +1431,10 @@ function Cashier() {
                 <input
                   type="date"
                   value={date}
-                  onChange={(e) => D(e.target.value)}
+                  onChange={(e) => {
+                    D(e.target.value);
+                    if (e.target.value > toDate) setToDate(e.target.value);
+                  }}
                 />
               </label>
               {access?.manager && (
