@@ -197,6 +197,9 @@ function Cashier() {
     [busy, B] = useState(false),
     [loading, L] = useState(true),
     [receipt, R] = useState<Order | null>(null);
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatus, setOrderStatus] = useState("all");
+  const [orderPayment, setOrderPayment] = useState("all");
   const [discountValue, setDiscountValue] = useState("");
   const [discountReason, setDiscountReason] = useState("");
   const [cashValue, setCashValue] = useState("");
@@ -398,6 +401,15 @@ function Cashier() {
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, []);
+  const searchTerm = orderSearch.trim().replace(/^#/, "").toLocaleLowerCase();
+  const visibleOrders = orders.filter(
+    (o) =>
+      (orderStatus === "all" || o.status === orderStatus) &&
+      (orderPayment === "all" || o.payment === orderPayment) &&
+      (!searchTerm ||
+        o.id.toLowerCase().includes(searchTerm) ||
+        o.note.toLocaleLowerCase().includes(searchTerm)),
+  );
   const paidOrders = orders.filter((o) => o.status !== "voided");
   const productTotals = new Map<
     string,
@@ -1513,6 +1525,69 @@ function Cashier() {
                 </div>
               </section>
             )}
+            <section aria-label={text("البحث في الطلبات", "Search orders")}>
+              <h2>{text("سجل الطلبات", "Order history")}</h2>
+              <div className="tito-toolbar">
+                <label>
+                  {text("رقم الطلب أو الملاحظات", "Order number or notes")}{" "}
+                  <input
+                    type="search"
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    placeholder={text(
+                      "ابحث برقم الإيصال أو الملاحظات…",
+                      "Search receipt number or notes…",
+                    )}
+                  />
+                </label>
+                <label>
+                  {text("الحالة", "Status")}{" "}
+                  <select
+                    value={orderStatus}
+                    onChange={(e) => setOrderStatus(e.target.value)}
+                  >
+                    <option value="all">{text("الكل", "All")}</option>
+                    <option value="paid">{text("مدفوع", "Paid")}</option>
+                    <option value="voided">{text("ملغى", "Voided")}</option>
+                  </select>
+                </label>
+                <label>
+                  {text("الدفع", "Payment")}{" "}
+                  <select
+                    value={orderPayment}
+                    onChange={(e) => setOrderPayment(e.target.value)}
+                  >
+                    <option value="all">{text("الكل", "All")}</option>
+                    <option value="cash">{text("نقدي", "Cash")}</option>
+                    <option value="card">{text("بطاقة", "Card")}</option>
+                    <option value="mixed">
+                      {text("نقدي + بطاقة", "Cash + card")}
+                    </option>
+                  </select>
+                </label>
+                <button
+                  onClick={() => {
+                    setOrderSearch("");
+                    setOrderStatus("all");
+                    setOrderPayment("all");
+                  }}
+                >
+                  {text("مسح الفلاتر", "Clear filters")}
+                </button>
+              </div>
+              <p>
+                {text(
+                  "هذه الفلاتر لقائمة الطلبات فقط؛ ملخص المبيعات والتصدير للفترة والفرع المختارين، حتى 1000 طلب.",
+                  "These filters apply only to the order list; reports and exports cover the selected period and branch, up to 1,000 orders.",
+                )}
+              </p>
+              {!loading && (
+                <small>
+                  {text("الطلبات المعروضة", "Orders shown")}:{" "}
+                  {visibleOrders.length} / {orders.length}
+                </small>
+              )}
+            </section>
             {loading ? (
               <p>
                 {t(
@@ -1535,7 +1610,7 @@ function Cashier() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => (
+                    {visibleOrders.map((o) => (
                       <tr key={o.id}>
                         <td>
                           <span dir="ltr">
@@ -1559,7 +1634,10 @@ function Cashier() {
                           )}
                         </td>
                         <td>
-                          {new Date(o.createdAt).toLocaleTimeString(locale, {
+                          {new Date(o.createdAt).toLocaleString(locale, {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
                             timeZone: "Asia/Riyadh",
                             hour: "2-digit",
                             minute: "2-digit",
@@ -1596,10 +1674,11 @@ function Cashier() {
                     ))}
                   </tbody>
                 </table>
-                {!orders.length && (
+                {!visibleOrders.length && (
                   <p className="tito-empty">
-                    {t(
-                      "\u0644\u0627 \u062A\u0648\u062C\u062F \u0637\u0644\u0628\u0627\u062A \u0644\u0647\u0630\u0627 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0641\u0631\u0639.",
+                    {text(
+                      "لا توجد طلبات تطابق البحث والفلاتر ضمن الفترة والفرع المختارين.",
+                      "No orders match the search and filters in the selected period and branch.",
                     )}
                   </p>
                 )}
