@@ -121,6 +121,10 @@ export const posOrdersTable = pgTable(
     service: text("service").notNull(),
     note: text("note").notNull().default(""),
     status: text("status").notNull().default("paid"),
+    kitchenState: text("kitchen_state").notNull().default("new"),
+    kitchenChangedAt: timestamp("kitchen_changed_at", {
+      withTimezone: true,
+    }).defaultNow(),
     voidReason: text("void_reason"),
     voidedAt: timestamp("voided_at", { withTimezone: true }),
     voidedBy: uuid("voided_by").references(() => usersTable.id, {
@@ -135,3 +139,21 @@ export const posOrdersTable = pgTable(
     index("pos_orders_tenant_created").on(t.restaurantId, t.createdAt),
   ],
 );
+
+export const posKitchenEventsTable = pgTable("pos_kitchen_events", {
+  id: uuid("id").primaryKey(),
+  restaurantId: uuid("restaurant_id")
+    .notNull()
+    .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => posOrdersTable.id, { onDelete: "restrict" }),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "restrict" }),
+  fromState: text("from_state").notNull(),
+  toState: text("to_state").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
