@@ -218,6 +218,45 @@ function Cashier() {
   const [held, setHeld] = useState<HeldOrder[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
   const draftKey = access ? `tito-held-${rid}-${access.userId}` : null;
+  const favoriteKey = access ? `tito-favorites-${rid}-${access.userId}` : null;
+  const [favoriteState, setFavoriteState] = useState<{
+    key: string | null;
+    ids: string[];
+  }>({ key: null, ids: [] });
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const favorites = favoriteState.key === favoriteKey ? favoriteState.ids : [];
+  useEffect(() => {
+    if (!favoriteKey) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(favoriteKey) || "[]");
+      setFavoriteState({
+        key: favoriteKey,
+        ids: Array.isArray(saved)
+          ? saved.filter((v: unknown) => typeof v === "string")
+          : [],
+      });
+    } catch {
+      setFavoriteState({ key: favoriteKey, ids: [] });
+    }
+    setFavoritesOnly(false);
+  }, [favoriteKey]);
+  function toggleFavorite(id: string) {
+    if (!favoriteKey) return;
+    const ids = favorites.includes(id)
+      ? favorites.filter((v) => v !== id)
+      : [...favorites, id];
+    try {
+      localStorage.setItem(favoriteKey, JSON.stringify(ids));
+      setFavoriteState({ key: favoriteKey, ids });
+    } catch {
+      toast.error(
+        lang === "ar"
+          ? "تعذر حفظ المفضلة على هذا الجهاز"
+          : "Could not save favorites on this device",
+      );
+    }
+  }
+
   const inflight = useRef(false),
     requestId = useRef<string | null>(null);
   const slug = getCurrentRestaurantSlug() || DEFAULT_SLUG;
@@ -1026,6 +1065,25 @@ function Cashier() {
                   ))}
                 </details>
               )}
+              <div className="tito-toolbar">
+                <button
+                  aria-pressed={favoritesOnly}
+                  onClick={() => {
+                    setFavoritesOnly((v) => !v);
+                    K("__all");
+                  }}
+                >
+                  {favoritesOnly
+                    ? text("عرض جميع الأصناف", "Show all products")
+                    : text("★ المفضلة", "★ Favorites")}
+                </button>
+                <small>
+                  {text(
+                    "النجمة تحفظ الصنف لهذا الحساب والمطعم على هذا الجهاز",
+                    "Stars save products for this account and restaurant on this device",
+                  )}
+                </small>
+              </div>
               <div className="tito-chips">
                 {["__all", ...new Set(products.map((p) => p.category))].map(
                   (c) => (
@@ -1050,42 +1108,69 @@ function Cashier() {
                   {products
                     .filter(
                       (p) =>
+                        (!favoritesOnly || favorites.includes(p.id)) &&
                         (category === "__all" || p.category === category) &&
                         (p.nameAr + " " + p.nameEn)
                           .toLowerCase()
                           .includes(search.toLowerCase()),
                     )
                     .map((p, i) => (
-                      <button
-                        disabled={busy}
-                        className="tito-product"
-                        key={p.id}
-                        onClick={() => change(p.id, 1)}
-                      >
-                        <div className={"tito-art color-" + (i % 4)}>
-                          {p.imageUrl ? (
-                            <img src={p.imageUrl} alt="" />
-                          ) : (
-                            <span>{productName(p).slice(0, 1)}</span>
+                      <div className="tito-product-wrap" key={p.id}>
+                        <button
+                          disabled={busy}
+                          className="tito-product"
+                          key={p.id}
+                          onClick={() => change(p.id, 1)}
+                        >
+                          <div className={"tito-art color-" + (i % 4)}>
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt="" />
+                            ) : (
+                              <span>{productName(p).slice(0, 1)}</span>
+                            )}
+                            <b>+</b>
+                          </div>
+                          <small>{categoryLabel(p.category)}</small>
+                          <h3>{productName(p)}</h3>
+                          <strong>
+                            {money(Math.round(p.price * 100))}{" "}
+                            <small>{t("\u0631.\u0633")}</small>
+                          </strong>
+                          {cart[p.id] > 0 && (
+                            <em>
+                              {cart[p.id]}
+                              {t("\u0641\u064A \u0627\u0644\u0637\u0644\u0628")}
+                            </em>
                           )}
-                          <b>+</b>
-                        </div>
-                        <small>{categoryLabel(p.category)}</small>
-                        <h3>{productName(p)}</h3>
-                        <strong>
-                          {money(Math.round(p.price * 100))}{" "}
-                          <small>{t("\u0631.\u0633")}</small>
-                        </strong>
-                        {cart[p.id] > 0 && (
-                          <em>
-                            {cart[p.id]}
-                            {t("\u0641\u064A \u0627\u0644\u0637\u0644\u0628")}
-                          </em>
-                        )}
-                      </button>
+                        </button>
+                        <button
+                          className="tito-favorite-toggle"
+                          disabled={!favoriteKey}
+                          aria-pressed={favorites.includes(p.id)}
+                          aria-label={
+                            (favorites.includes(p.id)
+                              ? text("إزالة من المفضلة: ", "Remove favorite: ")
+                              : text("إضافة للمفضلة: ", "Add favorite: ")) +
+                            productName(p)
+                          }
+                          onClick={() => toggleFavorite(p.id)}
+                        >
+                          {favorites.includes(p.id) ? "★" : "☆"}
+                        </button>
+                      </div>
                     ))}
                 </div>
               )}
+              {!loading &&
+                favoritesOnly &&
+                !products.some((p) => favorites.includes(p.id)) && (
+                  <p className="tito-empty">
+                    {text(
+                      "لا توجد أصناف مفضلة متاحة. اضغط عرض جميع الأصناف ثم النجمة بجوار الصنف.",
+                      "No available favorites. Show all products, then use the star beside a product.",
+                    )}
+                  </p>
+                )}
               {!loading && !products.length && (
                 <p className="tito-empty">
                   {text(
