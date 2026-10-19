@@ -1,3 +1,4 @@
+import { salesRange } from "../pos/reports";
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { eq, and, desc, gte, lt, inArray, isNull } from "drizzle-orm";
@@ -356,20 +357,22 @@ router.post(
   },
 );
 router.get(path + "/orders", async (req, res, next) => {
-  const date = z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .safeParse(req.query.date);
-  if (
-    !date.success ||
-    Number.isNaN(Date.parse(date.data)) ||
-    new Date(date.data).toISOString().slice(0, 10) !== date.data
-  ) {
-    res.status(400).json({ error: "التاريخ غير صالح" });
+  let range;
+  try {
+    range = salesRange(req.query.date, req.query.to);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
     return;
   }
-  const start = new Date(date.data + "T00:00:00+03:00"),
-    end = new Date(start.getTime() + 86400000);
+  if (
+    req.query.to &&
+    req.query.to !== req.query.date &&
+    !res.locals.posAccess.manager
+  ) {
+    res.status(403).json({ error: "تقارير الفترات متاحة للمدير فقط" });
+    return;
+  }
+  const { start, end } = range;
   const branch = z.uuid().safeParse(req.query.branchId);
   if (req.query.branchId && !branch.success) {
     res.status(400).json({ error: "الفرع غير صالح" });

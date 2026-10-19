@@ -189,6 +189,7 @@ function Cashier() {
     [note, Q] = useState(""),
     [orders, O] = useState<Order[]>([]),
     [date, D] = useState(today()),
+    [toDate, setToDate] = useState(today()),
     [truncated, U] = useState(false),
     [error, E] = useState(""),
     [busy, B] = useState(false),
@@ -332,7 +333,9 @@ function Cashier() {
     if (tab !== "orders") return;
     let cancelled = false;
     L(true);
-    api(`orders?date=${date}${branch ? "&branchId=" + branch : ""}`)
+    api(
+      `orders?date=${date}${access?.manager ? "&to=" + toDate : ""}${branch ? "&branchId=" + branch : ""}`,
+    )
       .then((j) => {
         if (!cancelled) {
           O(j.orders);
@@ -352,7 +355,7 @@ function Cashier() {
     return () => {
       cancelled = true;
     };
-  }, [tab, date, branch]);
+  }, [tab, date, toDate, branch, access?.manager]);
   useEffect(() => {
     if (!draftKey) return;
     try {
@@ -394,6 +397,33 @@ function Cashier() {
     return () => window.removeEventListener("keydown", fn);
   }, []);
   const paidOrders = orders.filter((o) => o.status !== "voided");
+  const productTotals = new Map<
+    string,
+    {
+      id: string;
+      nameAr: string;
+      nameEn?: string;
+      qty: number;
+      valueMinor: number;
+    }
+  >();
+  for (const order of paidOrders)
+    for (const item of order.items) {
+      const row = productTotals.get(item.id) || {
+        id: item.id,
+        nameAr: item.name_ar,
+        nameEn: item.name_en,
+        qty: 0,
+        valueMinor: 0,
+      };
+      row.qty += item.qty;
+      row.valueMinor += item.qty * item.price_minor;
+      productTotals.set(item.id, row);
+    }
+  const bestSellers = [...productTotals.values()]
+    .sort((a, b) => b.qty - a.qty || b.valueMinor - a.valueMinor)
+    .slice(0, 20);
+
   const lines = Object.entries(cart)
       .map(([id, qty]) => ({ ...products.find((p) => p.id === id)!, qty }))
       .filter((x) => x.id),
@@ -759,7 +789,7 @@ function Cashier() {
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `TITO-${date}.csv`;
+    a.download = `TITO-${date}-${access?.manager ? toDate : date}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -989,6 +1019,55 @@ function Cashier() {
                   ),
                 )}
               </div>
+              {access?.manager && !loading && !error && (
+                <section>
+                  <h2>
+                    {text("الأصناف الأكثر مبيعًا", "Best-selling products")}
+                  </h2>
+                  <p>
+                    {text(
+                      "القيمة قبل خصم الطلب؛ الطلبات الملغاة مستبعدة. عند تجاوز 1000 طلب، النتائج تخص أحدث 1000 فقط.",
+                      "Values before order discounts; voided orders excluded. Above 1,000 orders, results cover the latest 1,000 only.",
+                    )}
+                  </p>
+                  <div className="tito-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{text("الصنف", "Product")}</th>
+                          <th>{text("الكمية", "Quantity")}</th>
+                          <th>{text("قبل الخصم", "Before discount")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bestSellers.map((item) => (
+                          <tr key={item.id}>
+                            <td>
+                              {lang === "ar"
+                                ? item.nameAr
+                                : item.nameEn || item.nameAr}
+                            </td>
+                            <td>{item.qty}</td>
+                            <td>
+                              {money(item.valueMinor)} {t("ر.س")}
+                            </td>
+                          </tr>
+                        ))}
+                        {!bestSellers.length && (
+                          <tr>
+                            <td colSpan={3}>
+                              {text(
+                                "لا توجد مبيعات في الفترة",
+                                "No sales in this period",
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
               {loading ? (
                 <p>
                   {t(
@@ -1340,6 +1419,17 @@ function Cashier() {
                   onChange={(e) => D(e.target.value)}
                 />
               </label>
+              {access?.manager && (
+                <label>
+                  {text("إلى تاريخ", "To date")}{" "}
+                  <input
+                    type="date"
+                    value={toDate}
+                    min={date}
+                    onChange={(e) => setToDate(e.target.value)}
+                  />
+                </label>
+              )}
               <button onClick={exportCsv} disabled={!orders.length || loading}>
                 {t("\u062A\u0635\u062F\u064A\u0631 CSV \u2193")}
               </button>
@@ -1396,6 +1486,55 @@ function Cashier() {
                 </div>
               ))}
             </div>
+            {access?.manager && !loading && !error && (
+              <section>
+                <h2>
+                  {text("الأصناف الأكثر مبيعًا", "Best-selling products")}
+                </h2>
+                <p>
+                  {text(
+                    "القيمة قبل خصم الطلب؛ الطلبات الملغاة مستبعدة. عند تجاوز 1000 طلب، النتائج تخص أحدث 1000 فقط.",
+                    "Values before order discounts; voided orders excluded. Above 1,000 orders, results cover the latest 1,000 only.",
+                  )}
+                </p>
+                <div className="tito-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{text("الصنف", "Product")}</th>
+                        <th>{text("الكمية", "Quantity")}</th>
+                        <th>{text("قبل الخصم", "Before discount")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bestSellers.map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            {lang === "ar"
+                              ? item.nameAr
+                              : item.nameEn || item.nameAr}
+                          </td>
+                          <td>{item.qty}</td>
+                          <td>
+                            {money(item.valueMinor)} {t("ر.س")}
+                          </td>
+                        </tr>
+                      ))}
+                      {!bestSellers.length && (
+                        <tr>
+                          <td colSpan={3}>
+                            {text(
+                              "لا توجد مبيعات في الفترة",
+                              "No sales in this period",
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
             {loading ? (
               <p>
                 {t(
