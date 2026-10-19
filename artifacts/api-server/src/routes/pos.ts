@@ -1,3 +1,4 @@
+import kitchenRouter from "./posKitchen";
 import { salesRange } from "../pos/reports";
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
@@ -71,6 +72,7 @@ router.use(
     }
   },
 );
+router.use(path, kitchenRouter);
 router.use(path, shiftsRouter);
 router.use(path, movementsRouter);
 router.get(path + "/catalog", async (_req, res, next) => {

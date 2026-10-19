@@ -895,6 +895,9 @@ function Cashier() {
             "\u2197 \u0645\u0646\u064A\u0648 \u0627\u0644\u0639\u0645\u0644\u0627\u0621",
           )}
         </a>
+        <a href="/kitchen">
+          {text("المطبخ والتحضير", "Kitchen & preparation")}
+        </a>
         <a href="/dashboard">
           {t(
             "\u2190 \u0627\u0644\u0635\u0641\u062D\u0629 \u0627\u0644\u0645\u0648\u062D\u062F\u0629",

@@ -117,6 +117,11 @@ export default function ManagerDashboard() {
     ].filter((x) => x.value > 0);
   const nav = [
     {
+      name: text("المطبخ والتحضير", "Kitchen & preparation"),
+      href: "/kitchen",
+      icon: UtensilsCrossed,
+    },
+    {
       name: text("الملخص", "Overview"),
       href: "/dashboard",
       icon: LayoutDashboard,

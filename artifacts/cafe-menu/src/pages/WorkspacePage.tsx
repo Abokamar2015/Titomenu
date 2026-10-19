@@ -42,6 +42,11 @@ export default function WorkspacePage() {
             ...(rid
               ? [
                   ["الكاشير", "بيع الأصناف وتسجيل التحصيل والمبيعات", "/pos"],
+                  [
+                    "المطبخ والتحضير",
+                    "متابعة تجهيز الطلبات وتسليمها",
+                    "/kitchen",
+                  ],
                   ...(user?.is_super_admin ||
                   ["owner", "manager"].includes(
                     getCurrentMembership()?.role || "",
