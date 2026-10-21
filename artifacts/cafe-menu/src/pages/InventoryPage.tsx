@@ -530,8 +530,8 @@ function InventoryManager({ kind }: { kind: Kind }) {
           {kind === "items" && (
             <p className="iv-notice">
               {text(
-                "هذه شاشة تعريف المواد. لا تعرض رصيدًا فعليًا، والتكلفة مرجعية لكل وحدة. الربط بالمشتريات والوصفات والخصم الآلي غير مفعّل بعد.",
-                "This is the item catalog. It does not show on-hand balances. Costs are reference amounts per unit; purchasing, recipes and automatic stock deduction are not connected yet.",
+                "هذه شاشة تعريف المواد والتكلفة المرجعية لكل وحدة. تابع الكميات من الأرصدة والحركات. لا يمكن تغيير الوحدة بعد أول حركة، والربط بالمشتريات والوصفات والخصم الآلي غير مفعّل بعد.",
+                "This is the item catalog with reference costs per unit. Check quantities in Balances & movements. Units cannot change after the first movement; purchasing, recipes and automatic stock deduction are not connected yet.",
               )}
             </p>
           )}

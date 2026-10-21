@@ -1,3 +1,4 @@
+import inventoryStockRouter from "./inventoryStock";
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { randomUUID } from "node:crypto";
@@ -16,6 +17,7 @@ import {
   invSuppliersTable,
   invItemsTable,
   invMasterEventsTable,
+  invMovementsTable,
   usersTable,
 } from "@workspace/db";
 import {
@@ -35,6 +37,7 @@ router.use((req, res, next) => {
   }
   next();
 });
+router.use("/stock", inventoryStockRouter);
 for (const kind of ["suppliers", "items"] as const) {
   const table = kind === "suppliers" ? invSuppliersTable : invItemsTable;
   const schema = kind === "suppliers" ? supplierInput : itemInput;
@@ -150,12 +153,10 @@ for (const kind of ["suppliers", "items"] as const) {
         !identity.success ||
         (update && !version.success)
       ) {
-        res
-          .status(400)
-          .json({
-            error:
-              "تحقق من الاسم والكود والوحدة والمبالغ والبريد؛ الكود حروف إنجليزية وأرقام وشرطة فقط",
-          });
+        res.status(400).json({
+          error:
+            "تحقق من الاسم والكود والوحدة والمبالغ والبريد؛ الكود حروف إنجليزية وأرقام وشرطة فقط",
+        });
         return;
       }
       const a = res.locals.posAccess as {
@@ -195,6 +196,24 @@ for (const kind of ["suppliers", "items"] as const) {
           }
           if (kind === "items") {
             const item = values as z.infer<typeof itemInput>;
+            if (existing && "unit" in existing && existing.unit !== item.unit) {
+              const [movement] = await tx
+                .select({ id: invMovementsTable.id })
+                .from(invMovementsTable)
+                .where(
+                  and(
+                    eq(invMovementsTable.itemId, identity.data),
+                    eq(invMovementsTable.restaurantId, a.restaurantId),
+                  ),
+                )
+                .limit(1);
+              if (movement)
+                return {
+                  status: 409,
+                  error:
+                    "لا يمكن تغيير وحدة مادة لها حركات مخزون؛ أنشئ مادة جديدة بالوحدة المطلوبة",
+                };
+            }
             if (item.supplierId) {
               const [supplier] = await tx
                 .select()
@@ -252,18 +271,16 @@ for (const kind of ["suppliers", "items"] as const) {
           }
           if (!row)
             return { status: 409, error: "تعارض في تحديث السجل؛ حدّث القائمة" };
-          await tx
-            .insert(invMasterEventsTable)
-            .values({
-              id: randomUUID(),
-              restaurantId: a.restaurantId,
-              entityType: kind,
-              entityId: identity.data,
-              createdBy: a.userId,
-              action: update ? "update" : "create",
-              beforeData: existing || null,
-              afterData: row,
-            });
+          await tx.insert(invMasterEventsTable).values({
+            id: randomUUID(),
+            restaurantId: a.restaurantId,
+            entityType: kind,
+            entityId: identity.data,
+            createdBy: a.userId,
+            action: update ? "update" : "create",
+            beforeData: existing || null,
+            afterData: row,
+          });
           return { status: update ? 200 : 201, row };
         });
         res
@@ -273,12 +290,10 @@ for (const kind of ["suppliers", "items"] as const) {
       } catch (e) {
         const err = e as { code?: string; cause?: { code?: string } };
         if (err.code === "23505" || err.cause?.code === "23505") {
-          res
-            .status(409)
-            .json({
-              error:
-                "الكود مستخدم في هذا المطعم؛ اختر كودًا آخر أو افتح السجل المؤرشف",
-            });
+          res.status(409).json({
+            error:
+              "الكود مستخدم في هذا المطعم؛ اختر كودًا آخر أو افتح السجل المؤرشف",
+          });
           return;
         }
         next(e);

@@ -9,7 +9,7 @@ import {
   jsonb,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { restaurantsTable } from "./restaurants";
+import { restaurantsTable, branchesTable } from "./restaurants";
 import { usersTable } from "./users";
 const common = () => ({
   id: uuid("id").primaryKey(),
@@ -74,6 +74,90 @@ export const invMasterEventsTable = pgTable("inv_master_events", {
   action: text("action").notNull(),
   beforeData: jsonb("before_data"),
   afterData: jsonb("after_data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const invBalancesTable = pgTable(
+  "inv_balances",
+  {
+    id: uuid("id").primaryKey(),
+    restaurantId: uuid("restaurant_id")
+      .notNull()
+      .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => invItemsTable.id, { onDelete: "restrict" }),
+    branchId: uuid("branch_id").references(() => branchesTable.id, {
+      onDelete: "restrict",
+    }),
+    locationKey: text("location_key").notNull(),
+    quantityMilli: integer("quantity_milli").notNull().default(0),
+    version: integer("version").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("inv_balances_location").on(
+      t.restaurantId,
+      t.itemId,
+      t.locationKey,
+    ),
+  ],
+);
+export const invTransfersTable = pgTable("inv_transfers", {
+  id: uuid("id").primaryKey(),
+  restaurantId: uuid("restaurant_id")
+    .notNull()
+    .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => invItemsTable.id, { onDelete: "restrict" }),
+  fromBranchId: uuid("from_branch_id").references(() => branchesTable.id, {
+    onDelete: "restrict",
+  }),
+  toBranchId: uuid("to_branch_id").references(() => branchesTable.id, {
+    onDelete: "restrict",
+  }),
+  fromLocationKey: text("from_location_key").notNull(),
+  toLocationKey: text("to_location_key").notNull(),
+  quantityMilli: integer("quantity_milli").notNull(),
+  unit: text("unit").notNull(),
+  reason: text("reason").notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const invMovementsTable = pgTable("inv_movements", {
+  id: uuid("id").primaryKey(),
+  transferId: uuid("transfer_id").references(() => invTransfersTable.id, {
+    onDelete: "restrict",
+  }),
+  restaurantId: uuid("restaurant_id")
+    .notNull()
+    .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => invItemsTable.id, { onDelete: "restrict" }),
+  branchId: uuid("branch_id").references(() => branchesTable.id, {
+    onDelete: "restrict",
+  }),
+  locationKey: text("location_key").notNull(),
+  kind: text("kind").notNull(),
+  inputQuantityMilli: integer("input_quantity_milli").notNull(),
+  deltaMilli: integer("delta_milli").notNull(),
+  beforeMilli: integer("before_milli").notNull(),
+  afterMilli: integer("after_milli").notNull(),
+  unit: text("unit").notNull(),
+  reason: text("reason").notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -73,13 +73,23 @@ export default function ManagerSidebar({
         ))}
         <details
           className="md-nav-group"
-          open={active === "items" || active === "suppliers" ? true : undefined}
+          open={
+            active === "items" || active === "suppliers" || active === "stock"
+              ? true
+              : undefined
+          }
         >
           <summary>
             <Package size={19} />
             {text("المخزون", "Inventory")}
             <ChevronDown size={14} />
           </summary>
+          <a
+            className={active === "stock" ? "active" : ""}
+            href="/inventory/stock"
+          >
+            {text("الأرصدة والحركات", "Balances & movements")}
+          </a>
           <a
             className={active === "items" ? "active" : ""}
             href="/inventory/items"

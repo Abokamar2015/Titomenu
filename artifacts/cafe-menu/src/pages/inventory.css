@@ -330,3 +330,27 @@
     font-size: 11px;
   }
 }
+
+.iv-stock-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #838aa0;
+  font-size: 12px;
+}
+.iv-stock-location select {
+  border: 1px solid #e1e4ee;
+  border-radius: 8px;
+  padding: 10px;
+  color: #4c526a;
+  background: white;
+  font: inherit;
+  max-width: 260px;
+}
+.iv-stock-reason {
+  font-size: 13px;
+  color: #667088;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
