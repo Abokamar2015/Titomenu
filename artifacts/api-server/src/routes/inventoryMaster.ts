@@ -1,3 +1,4 @@
+import inventoryPurchasesRouter from "./inventoryPurchases";
 import inventoryStockRouter from "./inventoryStock";
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
@@ -38,6 +39,7 @@ router.use((req, res, next) => {
   next();
 });
 router.use("/stock", inventoryStockRouter);
+router.use("/purchases", inventoryPurchasesRouter);
 for (const kind of ["suppliers", "items"] as const) {
   const table = kind === "suppliers" ? invSuppliersTable : invItemsTable;
   const schema = kind === "suppliers" ? supplierInput : itemInput;

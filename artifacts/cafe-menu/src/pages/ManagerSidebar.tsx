@@ -74,7 +74,10 @@ export default function ManagerSidebar({
         <details
           className="md-nav-group"
           open={
-            active === "items" || active === "suppliers" || active === "stock"
+            active === "items" ||
+            active === "suppliers" ||
+            active === "stock" ||
+            active === "purchases"
               ? true
               : undefined
           }
@@ -84,6 +87,12 @@ export default function ManagerSidebar({
             {text("المخزون", "Inventory")}
             <ChevronDown size={14} />
           </summary>
+          <a
+            className={active === "purchases" ? "active" : ""}
+            href="/inventory/purchases"
+          >
+            {text("استلام المشتريات", "Purchase receipts")}
+          </a>
           <a
             className={active === "stock" ? "active" : ""}
             href="/inventory/stock"

@@ -25,6 +25,7 @@ type Row = {
 };
 type Movement = {
   transferId?: string | null;
+  purchaseId?: string | null;
   id: string;
   kind: string;
   inputQuantityMilli: number;
@@ -118,11 +119,15 @@ function StockManager() {
     })),
   ].filter((b) => b.key !== (branch || "none"));
   const movementLabel = (m: Movement) =>
-    m.transferId
-      ? m.kind === "issue"
-        ? text("تحويل صادر", "Transfer out")
-        : text("تحويل وارد", "Transfer in")
-      : kindLabel(m.kind);
+    m.purchaseId
+      ? m.kind === "receipt"
+        ? text("استلام مشتريات", "Purchase receipt")
+        : text("إلغاء استلام مشتريات", "Purchase reversal")
+      : m.transferId
+        ? m.kind === "issue"
+          ? text("تحويل صادر", "Transfer out")
+          : text("تحويل وارد", "Transfer in")
+        : kindLabel(m.kind);
   const unitLabel = (u: string) =>
     ({
       g: text("جرام", "Gram"),
@@ -430,6 +435,7 @@ function StockManager() {
           text("السبب", "Reason"),
           text("الموظف", "User"),
           text("مرجع التحويل", "Transfer reference"),
+          text("مرجع المشتريات", "Purchase reference"),
         ],
         ...history.rows.map((m) => [
           date(m.createdAt),
@@ -441,6 +447,7 @@ function StockManager() {
           m.reason,
           m.userName,
           m.transferId || "",
+          m.purchaseId || "",
         ]),
       ],
       `TITO-stock-ledger-${history.row.code}.csv`,
@@ -884,6 +891,17 @@ function StockManager() {
                   <p>
                     {m.userName} · {date(m.createdAt)}
                   </p>
+                  {m.purchaseId && (
+                    <p>
+                      {text("مرجع المشتريات", "Purchase reference")}:{" "}
+                      <a
+                        href={`/inventory/purchases?receipt=${m.purchaseId}`}
+                        title={m.purchaseId}
+                      >
+                        {m.purchaseId.slice(0, 8).toUpperCase()}
+                      </a>
+                    </p>
+                  )}
                   {m.transferId && (
                     <p>
                       {text("مرجع التحويل", "Transfer reference")}:{" "}

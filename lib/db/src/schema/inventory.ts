@@ -1,5 +1,6 @@
 import {
   pgTable,
+  date,
   uuid,
   text,
   boolean,
@@ -133,8 +134,54 @@ export const invTransfersTable = pgTable("inv_transfers", {
     .notNull()
     .defaultNow(),
 });
+export interface PurchaseLine {
+  itemId: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  unit: string;
+  quantityMilli: number;
+  unitCostMinor: number;
+  lineTotalMinor: number;
+}
+export const invPurchasesTable = pgTable("inv_purchases", {
+  id: uuid("id").primaryKey(),
+  restaurantId: uuid("restaurant_id")
+    .notNull()
+    .references(() => restaurantsTable.id, { onDelete: "restrict" }),
+  supplierId: uuid("supplier_id")
+    .notNull()
+    .references(() => invSuppliersTable.id, { onDelete: "restrict" }),
+  supplierName: text("supplier_name").notNull(),
+  supplierCode: text("supplier_code").notNull(),
+  branchId: uuid("branch_id").references(() => branchesTable.id, {
+    onDelete: "restrict",
+  }),
+  locationKey: text("location_key").notNull(),
+  reference: text("reference").notNull(),
+  documentDate: date("document_date").notNull(),
+  items: jsonb("items").$type<PurchaseLine[]>().notNull(),
+  totalMinor: integer("total_minor").notNull(),
+  notes: text("notes").notNull().default(""),
+  status: text("status").notNull().default("posted"),
+  requestHash: text("request_hash").notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  cancelledBy: uuid("cancelled_by").references(() => usersTable.id, {
+    onDelete: "restrict",
+  }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancellationReason: text("cancellation_reason"),
+});
 export const invMovementsTable = pgTable("inv_movements", {
   id: uuid("id").primaryKey(),
+  purchaseId: uuid("purchase_id").references(() => invPurchasesTable.id, {
+    onDelete: "restrict",
+  }),
   transferId: uuid("transfer_id").references(() => invTransfersTable.id, {
     onDelete: "restrict",
   }),

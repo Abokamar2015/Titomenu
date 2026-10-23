@@ -1,3 +1,4 @@
+import InventoryPurchasesPage from "@/pages/InventoryPurchasesPage";
 import InventoryStockPage from "@/pages/InventoryStockPage";
 import InventoryPage from "@/pages/InventoryPage";
 import KitchenPage from "@/pages/KitchenPage";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/kitchen" component={KitchenPage} />
       <Route path="/dashboard" component={WorkspacePage} />
       <Route path="/inventory/stock" component={InventoryStockPage} />
+      <Route path="/inventory/purchases" component={InventoryPurchasesPage} />
       <Route path="/inventory/suppliers">
         {() => <InventoryPage kind="suppliers" />}
       </Route>
