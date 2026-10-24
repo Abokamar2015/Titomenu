@@ -91,6 +91,12 @@ function Purchases() {
     [refresh, setRefresh] = useState(0),
     [rows, setRows] = useState<Document[]>([]),
     [total, setTotal] = useState(0),
+    [summary, setSummary] = useState<{
+      postedCount: number;
+      cancelledCount: number;
+      postedMinor: string;
+      cancelledMinor: string;
+    } | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const [branches, setBranches] = useState<
@@ -191,6 +197,7 @@ function Purchases() {
         if (!stop) {
           setRows(j.rows);
           setTotal(j.total);
+          setSummary(j.summary);
           if (offset > 0 && offset >= j.total)
             setOffset(Math.max(0, Math.floor((j.total - 1) / 50) * 50));
         }
@@ -200,6 +207,7 @@ function Purchases() {
           setError(e.message);
           setRows([]);
           setTotal(0);
+          setSummary(null);
         }
       })
       .finally(() => {
@@ -575,6 +583,15 @@ function Purchases() {
       setSaving(false);
     }
   }
+  function summaryMoney(value: string) {
+    const minor = BigInt(value),
+      locale = lang === "ar" ? "ar-SA" : "en-GB";
+    const decimal =
+      new Intl.NumberFormat(locale)
+        .formatToParts(1.1)
+        .find((p) => p.type === "decimal")?.value || ".";
+    return `${(minor / 100n).toLocaleString(locale)}${decimal}${Number(minor % 100n).toLocaleString(locale, { minimumIntegerDigits: 2, useGrouping: false })}`;
+  }
   function exportCsv() {
     const data = [
       [
@@ -594,6 +611,34 @@ function Purchases() {
       [
         text("نطاق التصدير", "Export scope"),
         text("الصفحة الحالية فقط", "Current page only"),
+      ],
+      [
+        text(
+          "عدد المستندات المعتمدة — جميع النتائج",
+          "Posted documents — all matches",
+        ),
+        String(summary?.postedCount ?? ""),
+      ],
+      [
+        text(
+          "قيمة المعتمد ر.س — جميع النتائج",
+          "Posted value SAR — all matches",
+        ),
+        summary ? summaryMoney(summary.postedMinor) : "",
+      ],
+      [
+        text(
+          "عدد المستندات الملغاة — جميع النتائج",
+          "Cancelled documents — all matches",
+        ),
+        String(summary?.cancelledCount ?? ""),
+      ],
+      [
+        text(
+          "قيمة الملغى ر.س — جميع النتائج",
+          "Cancelled value SAR — all matches",
+        ),
+        summary ? summaryMoney(summary.cancelledMinor) : "",
       ],
       [
         text("مرجع المورد", "Supplier reference"),
@@ -820,6 +865,44 @@ function Purchases() {
                 {text("تحديث", "Refresh")}
               </button>
             </div>
+            {!loading && !error && summary && (
+              <>
+                <div className="md-kpis">
+                  <div className="md-kpi">
+                    <p>
+                      {text(
+                        "قيمة الاستلامات المعتمدة ر.س",
+                        "Posted receipt value SAR",
+                      )}
+                    </p>
+                    <strong>{summaryMoney(summary.postedMinor)}</strong>
+                    <small>
+                      {summary.postedCount}{" "}
+                      {text("مستند معتمد", "posted documents")}
+                    </small>
+                  </div>
+                  <div className="md-kpi">
+                    <p>
+                      {text(
+                        "قيمة المستندات الملغاة ر.س",
+                        "Cancelled document value SAR",
+                      )}
+                    </p>
+                    <strong>{summaryMoney(summary.cancelledMinor)}</strong>
+                    <small>
+                      {summary.cancelledCount}{" "}
+                      {text("مستند ملغى", "cancelled documents")}
+                    </small>
+                  </div>
+                </div>
+                <p className="iv-help">
+                  {text(
+                    "الملخص يشمل جميع النتائج المطابقة للفلاتر المطبقة، وليس الصفحة فقط. قيمة الملغى معروضة منفصلة ولا تدخل في المعتمد. القيم المدخلة ليست مبالغ مدفوعة أو أرصدة مستحقة للموردين.",
+                    "Summary covers all matches for the applied filters, not only this page. Cancelled values are separate and excluded from posted values. Entered amounts are not payments or supplier amounts due.",
+                  )}
+                </p>
+              </>
+            )}
             {error && (
               <p className="md-error" role="alert">
                 {error}

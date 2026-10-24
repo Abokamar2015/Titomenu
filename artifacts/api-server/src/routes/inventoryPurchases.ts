@@ -10,6 +10,7 @@ import {
   asc,
   desc,
   count,
+  sql,
   gte,
   lte,
 } from "drizzle-orm";
@@ -90,7 +91,19 @@ router.get("/", async (req, res, next) => {
         : undefined,
     );
     const [totals] = await db
-      .select({ total: count() })
+      .select({
+        total: count(),
+        postedCount:
+          sql<number>`count(*) filter (where ${invPurchasesTable.status} = 'posted')`.mapWith(
+            Number,
+          ),
+        cancelledCount:
+          sql<number>`count(*) filter (where ${invPurchasesTable.status} = 'cancelled')`.mapWith(
+            Number,
+          ),
+        postedMinor: sql<string>`coalesce(sum(${invPurchasesTable.totalMinor}) filter (where ${invPurchasesTable.status} = 'posted'), 0)::text`,
+        cancelledMinor: sql<string>`coalesce(sum(${invPurchasesTable.totalMinor}) filter (where ${invPurchasesTable.status} = 'cancelled'), 0)::text`,
+      })
       .from(invPurchasesTable)
       .where(where);
     const rows = await db
@@ -110,7 +123,16 @@ router.get("/", async (req, res, next) => {
       .orderBy(desc(invPurchasesTable.createdAt), desc(invPurchasesTable.id))
       .limit(50)
       .offset(q.data.offset);
-    res.set("Cache-Control", "no-store").json({ rows, total: totals.total });
+    res.set("Cache-Control", "no-store").json({
+      rows,
+      total: totals.total,
+      summary: {
+        postedCount: totals.postedCount,
+        cancelledCount: totals.cancelledCount,
+        postedMinor: totals.postedMinor,
+        cancelledMinor: totals.cancelledMinor,
+      },
+    });
   } catch (e) {
     next(e);
   }
