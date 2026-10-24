@@ -602,6 +602,119 @@ function Purchases() {
         .find((p) => p.type === "decimal")?.value || ".";
     return `${(minor / 100n).toLocaleString(locale)}${decimal}${Number(minor % 100n).toLocaleString(locale, { minimumIntegerDigits: 2, useGrouping: false })}`;
   }
+  function printReview() {
+    if (loading || error || !summary || query !== search.trim()) return;
+    const popup = window.open("", "_blank", "width=1100,height=800");
+    if (!popup) {
+      setError(
+        text(
+          "اسمح بالنوافذ المنبثقة لطباعة التقرير",
+          "Allow pop-ups to print the report",
+        ),
+      );
+      return;
+    }
+    popup.opener = null;
+    const d = popup.document;
+    d.title = text("TITO — مراجعة المشتريات", "TITO — Purchase review");
+    d.documentElement.lang = lang;
+    d.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    const style = d.createElement("style");
+    style.textContent =
+      "body{font:14px Arial,sans-serif;margin:24px;color:#111}p{white-space:pre-wrap;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;table-layout:fixed;margin:20px 0}th,td{border:1px solid #aaa;padding:8px;text-align:start;overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}button{padding:12px 20px}@media print{button{display:none}body{margin:0}@page{size:A4 landscape;margin:12mm}}";
+    d.head.append(style);
+    const add = (tag: string, value: string) => {
+      const el = d.createElement(tag);
+      el.textContent = value;
+      d.body.append(el);
+      return el;
+    };
+    add("h1", d.title);
+    add(
+      "p",
+      `${text("الفترة حسب تاريخ المستند", "Period by document date")}: ${period.from || "—"} / ${period.to || "—"}`,
+    );
+    add(
+      "p",
+      `${text("المورد", "Supplier")}: ${supplierFilter?.name || text("كل الموردين", "All suppliers")}\n${text("الموقع", "Location")}: ${locationFilter === "all" ? text("كل المواقع", "All locations") : branchName(locationFilter === "none" ? null : locationFilter)}\n${text("الحالة", "Status")}: ${status === "all" ? text("الكل", "All") : status === "posted" ? text("معتمد", "Posted") : text("ملغى", "Cancelled")}\n${text("البحث", "Search")}: ${query || "—"}`,
+    );
+    add(
+      "h2",
+      text("ملخص جميع النتائج المطابقة", "Summary of all matching results"),
+    );
+    add(
+      "p",
+      `${text("المعتمد ر.س", "Posted SAR")}: ${summaryMoney(summary.postedMinor)} · ${summary.postedCount} ${text("مستند", "documents")}\n${text("الملغى ر.س", "Cancelled SAR")}: ${summaryMoney(summary.cancelledMinor)} · ${summary.cancelledCount} ${text("مستند", "documents")}`,
+    );
+    add(
+      "h2",
+      `${text("مستندات الصفحة الحالية فقط", "Current page documents only")} · ${Math.floor(offset / 50) + 1}`,
+    );
+    add(
+      "p",
+      `${text("المعروض", "Shown")}: ${rows.length ? offset + 1 : 0}–${Math.min(offset + rows.length, total)} / ${total}`,
+    );
+    const table = d.createElement("table"),
+      head = d.createElement("thead"),
+      body = d.createElement("tbody");
+    const row = (values: string[], header = false) => {
+      const tr = d.createElement("tr");
+      values.forEach((v) => {
+        const cell = d.createElement(header ? "th" : "td");
+        cell.textContent = v;
+        tr.append(cell);
+      });
+      return tr;
+    };
+    head.append(
+      row(
+        [
+          text("مرجع المورد", "Supplier reference"),
+          text("المورد", "Supplier"),
+          text("الموقع", "Location"),
+          text("تاريخ المستند", "Document date"),
+          text("القيمة ر.س", "Value SAR"),
+          text("الحالة", "Status"),
+        ],
+        true,
+      ),
+    );
+    rows.forEach((r) =>
+      body.append(
+        row([
+          r.reference,
+          r.supplierName,
+          branchName(r.branchId),
+          r.documentDate,
+          money(r.totalMinor),
+          r.status === "posted"
+            ? text("معتمد", "Posted")
+            : text("ملغى", "Cancelled"),
+        ]),
+      ),
+    );
+    table.append(head, body);
+    d.body.append(table);
+    if (!rows.length)
+      add("p", text("لا توجد مستندات مطابقة", "No matching documents"));
+    add(
+      "p",
+      text(
+        "ملخص تشغيلي وليس فاتورة ضريبية أو كشف حساب مورد. الملغى مستبعد من قيمة المعتمد. الجدول يضم الصفحة الحالية فقط، والملخص يشمل جميع النتائج المطابقة. التقرير نسخة من البيانات المحملة وقت عرضه وقد تتغير لاحقًا.",
+        "Operational summary, not a tax invoice or supplier account statement. Cancelled values are excluded from posted values. The table covers this page only; the summary covers all matches. This report reflects the loaded data and may change later.",
+      ),
+    );
+    add(
+      "p",
+      `${text("وقت الطباعة (الرياض)", "Printed at (Riyadh)")}: ${new Date().toLocaleString(lang === "ar" ? "ar-SA" : "en-GB", { timeZone: "Asia/Riyadh" })}`,
+    );
+    const button = add("button", text("طباعة / حفظ PDF", "Print / Save PDF"));
+    button.onclick = () => {
+      popup.focus();
+      popup.print();
+    };
+    popup.focus();
+  }
   function exportCsv() {
     const data = [
       [
@@ -782,6 +895,14 @@ function Purchases() {
                   </button>
                 ))}
               </div>
+              <button
+                disabled={
+                  loading || !!error || !summary || query !== search.trim()
+                }
+                onClick={printReview}
+              >
+                {text("طباعة المراجعة / PDF", "Print review / PDF")}
+              </button>
               <button
                 disabled={loading || !rows.length || query !== search.trim()}
                 onClick={exportCsv}
