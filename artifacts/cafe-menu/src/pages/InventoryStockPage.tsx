@@ -392,6 +392,142 @@ function StockManager() {
     a.click();
     URL.revokeObjectURL(url);
   }
+  function printStock() {
+    if (loading || error || search.trim() !== query) return;
+    const popup = window.open("", "_blank", "width=1100,height=800");
+    if (!popup) {
+      setError(
+        text(
+          "اسمح بالنوافذ المنبثقة لطباعة القائمة",
+          "Allow pop-ups to print the list",
+        ),
+      );
+      return;
+    }
+    popup.opener = null;
+    const d = popup.document;
+    d.title =
+      stockStatus === "low" || stockStatus === "out"
+        ? text(
+            "TITO — مراجعة احتياج المخزون",
+            "TITO — Stock replenishment review",
+          )
+        : text("TITO — مراجعة أرصدة المخزون", "TITO — Stock balance review");
+    d.documentElement.lang = lang;
+    d.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    const add = (tag: string, value: string) => {
+      const el = d.createElement(tag);
+      el.textContent = value;
+      d.body.append(el);
+      return el;
+    };
+    const style = d.createElement("style");
+    style.textContent =
+      "body{font:14px Arial,sans-serif;color:#111;margin:24px}p{white-space:pre-wrap;overflow-wrap:anywhere}table{width:100%;table-layout:fixed;border-collapse:collapse;margin:20px 0}th,td{border:1px solid #aaa;padding:8px;text-align:start;overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}button{padding:12px 20px}@media print{button{display:none}body{margin:0}@page{size:A4 landscape;margin:12mm}}";
+    d.head.append(style);
+    add("h1", d.title);
+    const filterName =
+      stockStatus === "low"
+        ? text("عند حد الطلب أو أقل", "At or below reorder level")
+        : stockStatus === "out"
+          ? text("نافد", "Out of stock")
+          : stockStatus === "uninitialized"
+            ? text("يحتاج تهيئة رصيد", "Needs an opening balance")
+            : text("كل المواد", "All items");
+    add(
+      "p",
+      `${text("الموقع", "Location")}: ${locationName}\n${text("حالة المخزون", "Stock status")}: ${filterName}\n${text("البحث", "Search")}: ${query || "—"}`,
+    );
+    add(
+      "p",
+      `${text("الصفحة الحالية فقط", "Current page only")}: ${offset / 50 + 1} · ${rows.length ? offset + 1 : 0}–${Math.min(offset + rows.length, total)} / ${total} ${text("مادة مطابقة", "matching items")}`,
+    );
+    const table = d.createElement("table"),
+      head = d.createElement("thead"),
+      body = d.createElement("tbody");
+    const row = (values: string[], header = false) => {
+      const tr = d.createElement("tr");
+      values.forEach((v) => {
+        const cell = d.createElement(header ? "th" : "td");
+        cell.textContent = v;
+        tr.append(cell);
+      });
+      return tr;
+    };
+    head.append(
+      row(
+        [
+          text("الكود", "Code"),
+          text("المادة", "Item"),
+          text("الوحدة", "Unit"),
+          text("الرصيد المسجل", "Recorded balance"),
+          text("حد الطلب", "Reorder level"),
+          text("النقص حتى الحد", "Shortfall to reorder level"),
+          text("الحالة", "Status"),
+        ],
+        true,
+      ),
+    );
+    rows.forEach((r) =>
+      body.append(
+        row([
+          r.code,
+          lang === "ar" ? r.nameAr : r.nameEn || r.nameAr,
+          unitLabel(r.unit),
+          r.balanceVersion ? quantity(r.quantityMilli) : "—",
+          r.minimumQuantity,
+          r.isActive && r.balanceVersion
+            ? quantity(
+                Math.max(
+                  0,
+                  Math.round(Number(r.minimumQuantity) * 1000) -
+                    r.quantityMilli,
+                ),
+              )
+            : "—",
+          !r.isActive
+            ? text("مؤرشفة", "Archived")
+            : !r.balanceVersion
+              ? text("غير مهيأ", "Not initialized")
+              : r.quantityMilli === 0
+                ? text("نافد", "Out of stock")
+                : Number(r.minimumQuantity) > 0 &&
+                    r.quantityMilli <=
+                      Math.round(Number(r.minimumQuantity) * 1000)
+                  ? text("عند الحد أو أقل", "At or below level")
+                  : text("فوق الحد", "Above level"),
+        ]),
+      ),
+    );
+    table.append(head, body);
+    d.body.append(table);
+    if (!rows.length)
+      add("p", text("لا توجد مواد مطابقة", "No matching items"));
+    add(
+      "p",
+      text(
+        "قائمة مراجعة تشغيلية للصفحة الحالية فقط، وليست أمر شراء. النقص هو الفرق حتى الحد الأدنى وليس كمية شراء مقترحة. الرصيد المسجل لا يغني عن الجرد الفعلي. المواد غير المهيأة لا نعرف رصيدها الفعلي؛ لا تُعامل كنافدة. لا تجمع الكميات ذات الوحدات المختلفة.",
+        "Operational review for this page only, not a purchase order. Shortfall is the gap to the reorder level, not a recommended order quantity. Recorded balances do not replace physical counts. Uninitialized items have unverified stock and are not treated as out of stock. Do not sum quantities in different units.",
+      ),
+    );
+    add(
+      "p",
+      `${text("وقت الطباعة (الرياض)", "Printed at (Riyadh)")}: ${date(new Date().toISOString())}`,
+    );
+    add(
+      "p",
+      text(
+        "نسخة من النتائج المحملة وقت عرضها؛ حدّث الأرصدة قبل المراجعة.",
+        "Snapshot of loaded results; refresh balances before reviewing.",
+      ),
+    );
+    const button = add("button", text("طباعة / حفظ PDF", "Print / Save PDF"));
+    button.onclick = () => {
+      popup.focus();
+      popup.print();
+    };
+    popup.focus();
+  }
   function exportStock() {
     download(
       [
@@ -560,6 +696,12 @@ function StockManager() {
                   </option>
                 </select>
               </label>
+              <button
+                disabled={loading || !!error || search.trim() !== query}
+                onClick={printStock}
+              >
+                {text("طباعة القائمة / PDF", "Print list / PDF")}
+              </button>
               <button
                 disabled={loading || !rows.length || search.trim() !== query}
                 onClick={exportStock}
