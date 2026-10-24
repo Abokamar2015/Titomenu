@@ -68,6 +68,7 @@ function StockManager() {
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [offset, setOffset] = useState(0),
+    [stockStatus, setStockStatus] = useState("all"),
     [refresh, setRefresh] = useState(0),
     [rows, setRows] = useState<Row[]>([]),
     [total, setTotal] = useState(0),
@@ -186,7 +187,7 @@ function StockManager() {
     setLoading(true);
     setError("");
     api(
-      `inventory/stock?search=${encodeURIComponent(query)}&offset=${offset}${branch ? "&branchId=" + branch : ""}`,
+      `inventory/stock?stockStatus=${stockStatus}&search=${encodeURIComponent(query)}&offset=${offset}${branch ? "&branchId=" + branch : ""}`,
       undefined,
       c.signal,
     )
@@ -212,7 +213,7 @@ function StockManager() {
       stop = true;
       c.abort();
     };
-  }, [rid, branch, query, offset, refresh]);
+  }, [rid, branch, stockStatus, query, offset, refresh]);
   function close() {
     if (saving) return;
     if (
@@ -395,6 +396,7 @@ function StockManager() {
     download(
       [
         [text("الفرع", "Location"), locationName],
+        [text("فلتر الرصيد", "Stock filter"), stockStatus],
         [
           text("الكود", "Code"),
           text("المادة", "Item"),
@@ -402,6 +404,7 @@ function StockManager() {
           text("الرصيد", "Balance"),
           text("حد الطلب", "Reorder level"),
           text("رصيد مهيأ بحركة", "Balance initialized by movement"),
+          text("النقص حتى الحد", "Shortfall to reorder level"),
         ],
         ...rows.map((r) => [
           r.code,
@@ -410,6 +413,15 @@ function StockManager() {
           quantity(r.quantityMilli),
           r.minimumQuantity,
           r.balanceVersion > 0 ? "1" : "0",
+          r.isActive && r.balanceVersion > 0
+            ? quantity(
+                Math.max(
+                  0,
+                  Math.round(Number(r.minimumQuantity) * 1000) -
+                    r.quantityMilli,
+                ),
+              )
+            : "",
         ]),
       ],
       `TITO-stock-page-${offset / 50 + 1}.csv`,
@@ -524,6 +536,30 @@ function StockManager() {
                   ))}
                 </select>
               </label>
+              <label className="iv-stock-location">
+                {text("حالة المخزون", "Stock status")}
+                <select
+                  value={stockStatus}
+                  onChange={(e) => {
+                    setStockStatus(e.target.value);
+                    setOffset(0);
+                  }}
+                >
+                  <option value="all">{text("كل المواد", "All items")}</option>
+                  <option value="low">
+                    {text("عند حد الطلب أو أقل", "At or below reorder level")}
+                  </option>
+                  <option value="out">
+                    {text("نافد — رصيد صفر", "Out of stock — zero balance")}
+                  </option>
+                  <option value="uninitialized">
+                    {text(
+                      "مواد تحتاج تهيئة الرصيد",
+                      "Items needing an opening balance",
+                    )}
+                  </option>
+                </select>
+              </label>
               <button
                 disabled={loading || !rows.length || search.trim() !== query}
                 onClick={exportStock}
@@ -553,6 +589,12 @@ function StockManager() {
                 {text("تحديث الرصيد", "Refresh balance")}
               </button>
             </div>
+            <p className="iv-help">
+              {text(
+                "التنبيهات للمواد النشطة في الموقع المختار فقط. انخفاض المخزون يشمل الرصيد عند الحد الأدنى أو أقل إذا كان الحد أكبر من صفر. المواد بلا حركات تظهر في فلتر التهيئة؛ لم يُتحقق من رصيدها الفعلي. يمكنك تعديل حد الطلب من مواد المخزون.",
+                "Alerts cover active items at the selected location only. Low stock means at or below a positive reorder level. Items without movements appear under opening balances; their physical stock is unverified. Edit reorder levels in the item catalog.",
+              )}
+            </p>
             {error && (
               <p className="md-error" role="alert">
                 {error}
@@ -572,6 +614,7 @@ function StockManager() {
                         text("الرصيد الحالي", "On-hand balance"),
                         text("حد الطلب", "Reorder level"),
                         text("الحالة", "Status"),
+                        text("النقص حتى الحد", "Shortfall to reorder level"),
                         text("إجراءات", "Actions"),
                       ].map((h) => (
                         <th key={h}>{h}</th>
@@ -609,14 +652,30 @@ function StockManager() {
                           >
                             {r.balanceVersion === 0
                               ? text("لم تُسجل حركة", "No movement recorded")
-                              : r.quantityMilli <=
-                                  Math.round(Number(r.minimumQuantity) * 1000)
-                                ? text(
-                                    "عند حد الطلب أو أقل",
-                                    "At or below reorder level",
-                                  )
-                                : text("فوق الحد", "Above reorder level")}
+                              : r.quantityMilli === 0
+                                ? text("نافد", "Out of stock")
+                                : Number(r.minimumQuantity) > 0 &&
+                                    r.quantityMilli <=
+                                      Math.round(
+                                        Number(r.minimumQuantity) * 1000,
+                                      )
+                                  ? text(
+                                      "عند حد الطلب أو أقل",
+                                      "At or below reorder level",
+                                    )
+                                  : text("فوق الحد", "Above reorder level")}
                           </span>
+                        </td>
+                        <td>
+                          {r.isActive && r.balanceVersion > 0
+                            ? quantity(
+                                Math.max(
+                                  0,
+                                  Math.round(Number(r.minimumQuantity) * 1000) -
+                                    r.quantityMilli,
+                                ),
+                              )
+                            : "—"}
                         </td>
                         <td>
                           <button
@@ -643,10 +702,10 @@ function StockManager() {
                     ))}
                     {!rows.length && !error && (
                       <tr>
-                        <td colSpan={7} className="iv-empty">
+                        <td colSpan={8} className="iv-empty">
                           {text(
-                            "لا توجد مواد. أضف المادة من تعريف المواد أولًا.",
-                            "No items. Create items in the catalog first.",
+                            "لا توجد مواد تطابق البحث وحالة المخزون في هذا الموقع.",
+                            "No items match the search and stock status at this location.",
                           )}
                         </td>
                       </tr>

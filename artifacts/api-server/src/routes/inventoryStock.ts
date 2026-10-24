@@ -30,6 +30,9 @@ router.get("/", async (req, res, next) => {
   const q = locationInput
     .extend({
       search: z.string().trim().max(150).default(""),
+      stockStatus: z
+        .enum(["all", "low", "out", "uninitialized"])
+        .default("all"),
       offset: z.coerce.number().int().min(0).max(1000000).default(0),
     })
     .safeParse(req.query);
@@ -45,8 +48,35 @@ router.get("/", async (req, res, next) => {
       res.status(400).json({ error: "الفرع غير موجود في هذا المطعم" });
       return;
     }
+    const join = and(
+      eq(invBalancesTable.itemId, invItemsTable.id),
+      eq(invBalancesTable.restaurantId, rid),
+      eq(invBalancesTable.locationKey, location),
+    );
+    // An absent balance is not a physical stock count. Keep it separate from alerts.
+    const stockFilter =
+      q.data.stockStatus === "low"
+        ? and(
+            eq(invItemsTable.isActive, true),
+            sql`${invBalancesTable.version} > 0`,
+            sql`${invItemsTable.minimumQuantity} > 0`,
+            sql`${invBalancesTable.quantityMilli} <= ${invItemsTable.minimumQuantity} * 1000`,
+          )
+        : q.data.stockStatus === "out"
+          ? and(
+              eq(invItemsTable.isActive, true),
+              sql`${invBalancesTable.version} > 0`,
+              eq(invBalancesTable.quantityMilli, 0),
+            )
+          : q.data.stockStatus === "uninitialized"
+            ? and(
+                eq(invItemsTable.isActive, true),
+                sql`coalesce(${invBalancesTable.version},0) = 0`,
+              )
+            : undefined;
     const where = and(
       eq(invItemsTable.restaurantId, rid),
+      stockFilter,
       q.data.search
         ? or(
             ilike(invItemsTable.nameAr, literalSearch(q.data.search)),
@@ -58,6 +88,7 @@ router.get("/", async (req, res, next) => {
     const [totals] = await db
       .select({ total: count() })
       .from(invItemsTable)
+      .leftJoin(invBalancesTable, join)
       .where(where);
     const rows = await db
       .select({
@@ -77,14 +108,7 @@ router.get("/", async (req, res, next) => {
         updatedAt: invBalancesTable.updatedAt,
       })
       .from(invItemsTable)
-      .leftJoin(
-        invBalancesTable,
-        and(
-          eq(invBalancesTable.itemId, invItemsTable.id),
-          eq(invBalancesTable.restaurantId, rid),
-          eq(invBalancesTable.locationKey, location),
-        ),
-      )
+      .leftJoin(invBalancesTable, join)
       .where(where)
       .orderBy(asc(invItemsTable.nameAr), asc(invItemsTable.id))
       .limit(50)

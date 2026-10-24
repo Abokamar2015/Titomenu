@@ -387,6 +387,146 @@ function Purchases() {
       if (version === detailVersion.current) setDetailBusy(false);
     }
   }
+  async function printReceipt() {
+    if (!detail || saving || detailBusy) return;
+    const popup = window.open("", "_blank", "width=1000,height=800");
+    if (!popup) {
+      setDetailError(
+        text(
+          "اسمح بالنوافذ المنبثقة لطباعة السند",
+          "Allow pop-ups to print the receipt",
+        ),
+      );
+      return;
+    }
+    popup.opener = null;
+    const d = popup.document;
+    d.documentElement.lang = lang;
+    d.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    const add = (tag: string, value: string) => {
+      const el = d.createElement(tag);
+      el.textContent = value;
+      d.body.append(el);
+      return el;
+    };
+    add(
+      "p",
+      text("جارٍ تحميل آخر حالة للسند…", "Loading current receipt status…"),
+    );
+    try {
+      const doc: Document = await api(`inventory/purchases/${detail.id}`);
+      if (popup.closed) return;
+      d.body.replaceChildren();
+      d.title = `TITO - ${doc.reference}`;
+      const style = d.createElement("style");
+      style.textContent =
+        "body{font:14px Arial,sans-serif;color:#111;margin:24px}h1{font-size:24px}p{white-space:pre-wrap;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;margin:20px 0;table-layout:fixed}th,td{border:1px solid #aaa;padding:8px;text-align:start;overflow-wrap:anywhere}thead{display:table-header-group}tr{break-inside:avoid}button{padding:12px 20px;cursor:pointer}.cancelled{font-size:22px;font-weight:bold;border:2px solid #111;padding:12px}@media print{button{display:none}body{margin:0}@page{size:A4 portrait;margin:12mm}}";
+      d.head.append(style);
+      add("h1", text("TITO — سند استلام مشتريات", "TITO — Purchase receipt"));
+      if (doc.status === "cancelled")
+        add(
+          "p",
+          text("ملغى — تم عكس الاستلام", "CANCELLED — Receipt reversed"),
+        ).className = "cancelled";
+      add(
+        "p",
+        `${text("حالة المستند", "Status")}: ${doc.status === "posted" ? text("معتمد", "Posted") : text("ملغى", "Cancelled")}`,
+      );
+      add(
+        "p",
+        `${text("المورد", "Supplier")}: ${doc.supplierName} · ${doc.supplierCode}`,
+      );
+      add("p", `${text("الموقع", "Location")}: ${branchName(doc.branchId)}`);
+      add(
+        "p",
+        `${text("مرجع المورد", "Supplier reference")}: ${doc.reference}\n${text("تاريخ المستند", "Document date")}: ${doc.documentDate}\n${text("معرف الاستلام", "Receipt ID")}: ${doc.id}`,
+      );
+      const stamp = (v: string) =>
+        new Date(v).toLocaleString(lang === "ar" ? "ar-SA" : "en-GB", {
+          timeZone: "Asia/Riyadh",
+        });
+      add(
+        "p",
+        `${text("وقت التسجيل (الرياض)", "Recorded at (Riyadh)")}: ${stamp(doc.createdAt)}`,
+      );
+      const table = d.createElement("table"),
+        head = d.createElement("thead"),
+        body = d.createElement("tbody");
+      const row = (values: string[], header = false) => {
+        const tr = d.createElement("tr");
+        values.forEach((value) => {
+          const cell = d.createElement(header ? "th" : "td");
+          cell.textContent = value;
+          tr.append(cell);
+        });
+        return tr;
+      };
+      head.append(
+        row(
+          [
+            text("المادة / الرمز", "Item / code"),
+            text("الوحدة", "Unit"),
+            text("الكمية", "Quantity"),
+            text("تكلفة الوحدة ر.س", "Unit cost SAR"),
+            text("القيمة ر.س", "Value SAR"),
+          ],
+          true,
+        ),
+      );
+      doc.items.forEach((line) =>
+        body.append(
+          row([
+            `${lang === "ar" ? line.nameAr : line.nameEn || line.nameAr} · ${line.code}`,
+            line.unit,
+            qty(line.quantityMilli),
+            money(line.unitCostMinor),
+            money(line.lineTotalMinor),
+          ]),
+        ),
+      );
+      table.append(head, body);
+      d.body.append(table);
+      add(
+        "h2",
+        `${text("الإجمالي المدخل ر.س", "Entered total SAR")}: ${money(doc.totalMinor)}`,
+      );
+      if (doc.notes) add("p", `${text("ملاحظات", "Notes")}: ${doc.notes}`);
+      if (doc.status === "cancelled") {
+        add(
+          "p",
+          `${text("سبب الإلغاء", "Cancellation reason")}: ${doc.cancellationReason || ""}`,
+        );
+        if (doc.cancelledAt)
+          add(
+            "p",
+            `${text("وقت الإلغاء (الرياض)", "Cancelled at (Riyadh)")}: ${stamp(doc.cancelledAt)}`,
+          );
+      }
+      add(
+        "p",
+        text(
+          "سند تشغيلي لاستلام المخزون، وليس فاتورة ضريبية أو إثبات سداد للمورد.",
+          "Operational stock receipt. This is not a tax invoice or proof of supplier payment.",
+        ),
+      );
+      add(
+        "p",
+        `${text("طُبع بتاريخ (الرياض)", "Printed at (Riyadh)")}: ${stamp(new Date().toISOString())}`,
+      );
+      const button = add("button", text("طباعة / حفظ PDF", "Print / Save PDF"));
+      button.onclick = () => {
+        popup.focus();
+        popup.print();
+      };
+      popup.focus();
+    } catch (e) {
+      if (!popup.closed) {
+        d.body.replaceChildren();
+        add("p", (e as Error).message);
+      }
+      setDetailError((e as Error).message);
+    }
+  }
   async function cancel() {
     if (!detail || flight.current) return;
     const reason = prompt(
@@ -1044,6 +1184,11 @@ function Purchases() {
                       "Posted receipts are immutable. Cancellation reverses all quantities if available at this location. It does not refund money or settle supplier accounts.",
                     )}
                   </p>
+                  <footer>
+                    <button disabled={saving} onClick={printReceipt}>
+                      {text("طباعة / حفظ PDF", "Print / Save PDF")}
+                    </button>
+                  </footer>
                   {detail.status === "posted" && (
                     <footer>
                       <button disabled={saving} onClick={cancel}>
