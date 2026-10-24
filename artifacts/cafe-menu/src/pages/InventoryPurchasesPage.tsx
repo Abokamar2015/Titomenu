@@ -80,6 +80,7 @@ function Purchases() {
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [status, setStatus] = useState("all"),
+    [locationFilter, setLocationFilter] = useState("all"),
     [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
     [period, setPeriod] = useState({ from: "", to: "" }),
@@ -189,7 +190,7 @@ function Purchases() {
     setLoading(true);
     setError("");
     api(
-      `inventory/purchases?status=${status}&offset=${offset}&search=${encodeURIComponent(query)}${period.from ? "&from=" + encodeURIComponent(period.from) : ""}${period.to ? "&to=" + encodeURIComponent(period.to) : ""}${supplierFilter ? "&supplierId=" + encodeURIComponent(supplierFilter.id) : ""}`,
+      `inventory/purchases?location=${encodeURIComponent(locationFilter)}&status=${status}&offset=${offset}&search=${encodeURIComponent(query)}${period.from ? "&from=" + encodeURIComponent(period.from) : ""}${period.to ? "&to=" + encodeURIComponent(period.to) : ""}${supplierFilter ? "&supplierId=" + encodeURIComponent(supplierFilter.id) : ""}`,
       undefined,
       c.signal,
     )
@@ -217,7 +218,16 @@ function Purchases() {
       stop = true;
       c.abort();
     };
-  }, [rid, status, query, offset, refresh, period, supplierFilter]);
+  }, [
+    rid,
+    status,
+    query,
+    offset,
+    refresh,
+    period,
+    supplierFilter,
+    locationFilter,
+  ]);
   useEffect(() => {
     if (!form) return;
     let stop = false;
@@ -606,6 +616,12 @@ function Purchases() {
         text("المورد المحدد", "Selected supplier"),
         supplierFilter?.name || text("كل الموردين", "All suppliers"),
       ],
+      [
+        text("الموقع المحدد", "Selected location"),
+        locationFilter === "all"
+          ? text("كل المواقع", "All locations")
+          : branchName(locationFilter === "none" ? null : locationFilter),
+      ],
       [text("حالة المستند", "Document status"), status],
       [text("البحث", "Search"), query],
       [
@@ -811,6 +827,7 @@ function Purchases() {
                   setTo("");
                   setPeriod({ from: "", to: "" });
                   setSupplierFilter(null);
+                  setLocationFilter("all");
                   setSearch("");
                   setQuery("");
                   setStatus("all");
@@ -844,6 +861,28 @@ function Purchases() {
               {text("الفترة المطبقة", "Applied dates")}: {period.from || "—"} /{" "}
               {period.to || "—"}
             </p>
+            <div className="iv-list-toolbar">
+              <label className="iv-stock-location">
+                {text("موقع الاستلام", "Receiving location")}
+                <select
+                  value={locationFilter}
+                  onChange={(e) => {
+                    setLocationFilter(e.target.value);
+                    setOffset(0);
+                  }}
+                >
+                  <option value="all">
+                    {text("كل المواقع", "All locations")}
+                  </option>
+                  <option value="none">{text("بدون فرع", "No branch")}</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {lang === "ar" ? b.nameAr : b.nameEn || b.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <div className="iv-search">
               <label>
                 <input

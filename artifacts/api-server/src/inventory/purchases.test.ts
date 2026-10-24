@@ -81,3 +81,17 @@ test("purchase filters validate inclusive calendar boundaries and supplier IDs",
   assert.equal(purchaseListInput.parse({ to: "2026-10-24" }).offset, 0);
   assert.equal(purchaseListInput.safeParse({}).success, true);
 });
+
+test("purchase location filter distinguishes all locations, unbranched stock and a single branch", () => {
+  assert.equal(purchaseListInput.parse({}).location, "all");
+  assert.equal(purchaseListInput.parse({ location: "none" }).location, "none");
+  assert.equal(
+    purchaseListInput.parse({ location: line.itemId }).location,
+    line.itemId,
+  );
+  assert.equal(purchaseListInput.safeParse({ location: "" }).success, false);
+  assert.equal(
+    purchaseListInput.safeParse({ location: "other-tenant" }).success,
+    false,
+  );
+});

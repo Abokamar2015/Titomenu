@@ -65,6 +65,9 @@ export const purchaseListInput = z
     status: z.enum(["all", "posted", "cancelled"]).default("all"),
     offset: z.coerce.number().int().min(0).max(1000000).default(0),
     supplierId: z.uuid().optional(),
+    location: z
+      .union([z.literal("all"), z.literal("none"), z.uuid()])
+      .default("all"),
     from: purchaseInput.shape.documentDate.optional(),
     to: purchaseInput.shape.documentDate.optional(),
   })

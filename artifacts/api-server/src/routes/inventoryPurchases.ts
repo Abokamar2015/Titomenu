@@ -73,6 +73,9 @@ router.get("/", async (req, res, next) => {
   try {
     const where = and(
       eq(invPurchasesTable.restaurantId, rid),
+      q.data.location === "all"
+        ? undefined
+        : eq(invPurchasesTable.locationKey, q.data.location),
       q.data.supplierId
         ? eq(invPurchasesTable.supplierId, q.data.supplierId)
         : undefined,
