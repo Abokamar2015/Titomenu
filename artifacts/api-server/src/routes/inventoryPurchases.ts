@@ -1,7 +1,18 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { randomUUID, createHash } from "node:crypto";
-import { and, eq, or, ilike, inArray, asc, desc, count } from "drizzle-orm";
+import {
+  and,
+  eq,
+  or,
+  ilike,
+  inArray,
+  asc,
+  desc,
+  count,
+  gte,
+  lte,
+} from "drizzle-orm";
 import {
   db,
   invPurchasesTable,
@@ -12,7 +23,11 @@ import {
   branchesTable,
   type PurchaseLine,
 } from "@workspace/db";
-import { purchaseInput, purchaseAmounts } from "../inventory/purchases";
+import {
+  purchaseInput,
+  purchaseAmounts,
+  purchaseListInput,
+} from "../inventory/purchases";
 import { stockChange } from "../inventory/stock";
 import { literalSearch } from "../inventory/validation";
 const router: IRouter = Router();
@@ -48,13 +63,7 @@ async function balanceAt(
   return b;
 }
 router.get("/", async (req, res, next) => {
-  const q = z
-    .object({
-      search: z.string().trim().max(150).default(""),
-      status: z.enum(["all", "posted", "cancelled"]).default("all"),
-      offset: z.coerce.number().int().min(0).max(1000000).default(0),
-    })
-    .safeParse(req.query);
+  const q = purchaseListInput.safeParse(req.query);
   if (!q.success) {
     res.status(400).json({ error: "فلاتر المشتريات غير صالحة" });
     return;
@@ -63,6 +72,13 @@ router.get("/", async (req, res, next) => {
   try {
     const where = and(
       eq(invPurchasesTable.restaurantId, rid),
+      q.data.supplierId
+        ? eq(invPurchasesTable.supplierId, q.data.supplierId)
+        : undefined,
+      q.data.from
+        ? gte(invPurchasesTable.documentDate, q.data.from)
+        : undefined,
+      q.data.to ? lte(invPurchasesTable.documentDate, q.data.to) : undefined,
       q.data.status === "all"
         ? undefined
         : eq(invPurchasesTable.status, q.data.status),
@@ -82,6 +98,7 @@ router.get("/", async (req, res, next) => {
         id: invPurchasesTable.id,
         reference: invPurchasesTable.reference,
         supplierName: invPurchasesTable.supplierName,
+        supplierId: invPurchasesTable.supplierId,
         branchId: invPurchasesTable.branchId,
         documentDate: invPurchasesTable.documentDate,
         totalMinor: invPurchasesTable.totalMinor,
@@ -126,11 +143,9 @@ router.get("/:id", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   const parsed = purchaseInput.safeParse(req.body);
   if (!parsed.success) {
-    res
-      .status(400)
-      .json({
-        error: "تحقق من المورد والتاريخ والمرجع والمواد والكميات والتكلفة",
-      });
+    res.status(400).json({
+      error: "تحقق من المورد والتاريخ والمرجع والمواد والكميات والتكلفة",
+    });
     return;
   }
   const b = parsed.data,
@@ -266,22 +281,20 @@ router.post("/", async (req, res, next) => {
           "receipt",
           line.quantityMilli,
         );
-        await tx
-          .insert(invMovementsTable)
-          .values({
-            id: randomUUID(),
-            restaurantId: a.restaurantId,
-            itemId: line.itemId,
-            branchId: b.branchId,
-            locationKey: b.branchId || "none",
-            purchaseId: row.id,
-            kind: "receipt",
-            inputQuantityMilli: line.quantityMilli,
-            ...change,
-            unit: line.unit,
-            reason: `استلام مشتريات ${b.reference}`,
-            createdBy: a.userId,
-          });
+        await tx.insert(invMovementsTable).values({
+          id: randomUUID(),
+          restaurantId: a.restaurantId,
+          itemId: line.itemId,
+          branchId: b.branchId,
+          locationKey: b.branchId || "none",
+          purchaseId: row.id,
+          kind: "receipt",
+          inputQuantityMilli: line.quantityMilli,
+          ...change,
+          unit: line.unit,
+          reason: `استلام مشتريات ${b.reference}`,
+          createdBy: a.userId,
+        });
         await tx
           .update(invBalancesTable)
           .set({
@@ -356,25 +369,23 @@ router.post("/:id/cancel", async (req, res, next) => {
           "issue",
           line.quantityMilli,
         );
-        await tx
-          .insert(invMovementsTable)
-          .values({
-            id: randomUUID(),
-            restaurantId: a.restaurantId,
-            itemId: line.itemId,
-            branchId: doc.branchId,
-            locationKey: doc.locationKey,
-            purchaseId: doc.id,
-            kind: "issue",
-            inputQuantityMilli: line.quantityMilli,
-            ...change,
-            unit: line.unit,
-            reason: `إلغاء مشتريات ${doc.reference}: ${reason.data}`.slice(
-              0,
-              500,
-            ),
-            createdBy: a.userId,
-          });
+        await tx.insert(invMovementsTable).values({
+          id: randomUUID(),
+          restaurantId: a.restaurantId,
+          itemId: line.itemId,
+          branchId: doc.branchId,
+          locationKey: doc.locationKey,
+          purchaseId: doc.id,
+          kind: "issue",
+          inputQuantityMilli: line.quantityMilli,
+          ...change,
+          unit: line.unit,
+          reason: `إلغاء مشتريات ${doc.reference}: ${reason.data}`.slice(
+            0,
+            500,
+          ),
+          createdBy: a.userId,
+        });
         await tx
           .update(invBalancesTable)
           .set({
@@ -402,12 +413,10 @@ router.post("/:id/cancel", async (req, res, next) => {
       .json(result.error ? { error: result.error } : result.row);
   } catch (e) {
     if (e instanceof Error && e.message === "الرصيد لا يكفي للصرف أو الإتلاف") {
-      res
-        .status(409)
-        .json({
-          error:
-            "الرصيد الحالي لا يكفي لعكس استلام المشتريات؛ راجع الكمية الفعلية والحركات اللاحقة",
-        });
+      res.status(409).json({
+        error:
+          "الرصيد الحالي لا يكفي لعكس استلام المشتريات؛ راجع الكمية الفعلية والحركات اللاحقة",
+      });
       return;
     }
     next(e);

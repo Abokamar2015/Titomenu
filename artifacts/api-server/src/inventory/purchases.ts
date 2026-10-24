@@ -58,3 +58,16 @@ export function purchaseAmounts(
   });
   return { lines: result, totalMinor };
 }
+
+export const purchaseListInput = z
+  .object({
+    search: z.string().trim().max(150).default(""),
+    status: z.enum(["all", "posted", "cancelled"]).default("all"),
+    offset: z.coerce.number().int().min(0).max(1000000).default(0),
+    supplierId: z.uuid().optional(),
+    from: purchaseInput.shape.documentDate.optional(),
+    to: purchaseInput.shape.documentDate.optional(),
+  })
+  .refine((v) => !v.from || !v.to || v.from <= v.to, {
+    message: "Start date must not follow end date",
+  });

@@ -33,6 +33,7 @@ type Document = {
   id: string;
   reference: string;
   supplierName: string;
+  supplierId: string;
   supplierCode: string;
   branchId: string | null;
   documentDate: string;
@@ -79,6 +80,13 @@ function Purchases() {
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [status, setStatus] = useState("all"),
+    [from, setFrom] = useState(""),
+    [to, setTo] = useState(""),
+    [period, setPeriod] = useState({ from: "", to: "" }),
+    [supplierFilter, setSupplierFilter] = useState<{
+      id: string;
+      name: string;
+    } | null>(null),
     [offset, setOffset] = useState(0),
     [refresh, setRefresh] = useState(0),
     [rows, setRows] = useState<Document[]>([]),
@@ -175,7 +183,7 @@ function Purchases() {
     setLoading(true);
     setError("");
     api(
-      `inventory/purchases?status=${status}&offset=${offset}&search=${encodeURIComponent(query)}`,
+      `inventory/purchases?status=${status}&offset=${offset}&search=${encodeURIComponent(query)}${period.from ? "&from=" + encodeURIComponent(period.from) : ""}${period.to ? "&to=" + encodeURIComponent(period.to) : ""}${supplierFilter ? "&supplierId=" + encodeURIComponent(supplierFilter.id) : ""}`,
       undefined,
       c.signal,
     )
@@ -201,7 +209,7 @@ function Purchases() {
       stop = true;
       c.abort();
     };
-  }, [rid, status, query, offset, refresh]);
+  }, [rid, status, query, offset, refresh, period, supplierFilter]);
   useEffect(() => {
     if (!form) return;
     let stop = false;
@@ -570,6 +578,24 @@ function Purchases() {
   function exportCsv() {
     const data = [
       [
+        text("من تاريخ المستند", "Document date from"),
+        period.from || text("كل التواريخ", "All dates"),
+      ],
+      [
+        text("إلى تاريخ المستند", "Document date to"),
+        period.to || text("كل التواريخ", "All dates"),
+      ],
+      [
+        text("المورد المحدد", "Selected supplier"),
+        supplierFilter?.name || text("كل الموردين", "All suppliers"),
+      ],
+      [text("حالة المستند", "Document status"), status],
+      [text("البحث", "Search"), query],
+      [
+        text("نطاق التصدير", "Export scope"),
+        text("الصفحة الحالية فقط", "Current page only"),
+      ],
+      [
         text("مرجع المورد", "Supplier reference"),
         text("المورد", "Supplier"),
         text("الموقع", "Location"),
@@ -703,6 +729,76 @@ function Purchases() {
                 {text("تصدير الصفحة CSV", "Export page CSV")}
               </button>
             </div>
+            <form
+              className="iv-list-toolbar"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (from && to && from > to) return;
+                setPeriod({ from, to });
+                setOffset(0);
+              }}
+            >
+              <label>
+                {text("من تاريخ المستند", "Document date from")}
+                <input
+                  type="date"
+                  value={from}
+                  max={to || undefined}
+                  onChange={(e) => setFrom(e.target.value)}
+                />
+              </label>
+              <label>
+                {text("إلى تاريخ المستند", "Document date to")}
+                <input
+                  type="date"
+                  value={to}
+                  min={from || undefined}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </label>
+              <button type="submit">
+                {text("تطبيق الفترة", "Apply dates")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                  setPeriod({ from: "", to: "" });
+                  setSupplierFilter(null);
+                  setSearch("");
+                  setQuery("");
+                  setStatus("all");
+                  setOffset(0);
+                }}
+              >
+                {text("مسح الفلاتر", "Clear filters")}
+              </button>
+            </form>
+            <p className="iv-help">
+              {text(
+                "الفترة حسب تاريخ مستند المورد وتشمل يوم البداية والنهاية. اضغط اسم المورد في أي صف لعرض مستنداته فقط. التصدير للصفحة الحالية.",
+                "Dates filter the supplier document date, including both boundaries. Click a supplier name in any row to show only their documents. CSV exports the current page.",
+              )}
+            </p>
+            {supplierFilter && (
+              <p className="iv-notice">
+                {text("المورد المحدد", "Selected supplier")}:{" "}
+                {supplierFilter.name}{" "}
+                <button
+                  onClick={() => {
+                    setSupplierFilter(null);
+                    setOffset(0);
+                  }}
+                >
+                  {text("كل الموردين", "All suppliers")}
+                </button>
+              </p>
+            )}
+            <p className="iv-help">
+              {text("الفترة المطبقة", "Applied dates")}: {period.from || "—"} /{" "}
+              {period.to || "—"}
+            </p>
             <div className="iv-search">
               <label>
                 <input
@@ -753,7 +849,19 @@ function Purchases() {
                     {rows.map((r) => (
                       <tr key={r.id}>
                         <td>{r.reference}</td>
-                        <td>{r.supplierName}</td>
+                        <td>
+                          <button
+                            onClick={() => {
+                              setSupplierFilter({
+                                id: r.supplierId,
+                                name: r.supplierName,
+                              });
+                              setOffset(0);
+                            }}
+                          >
+                            {r.supplierName}
+                          </button>
+                        </td>
                         <td>{branchName(r.branchId)}</td>
                         <td>{r.documentDate}</td>
                         <td>{money(r.totalMinor)}</td>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { purchaseAmounts, purchaseInput } from "./purchases";
+import { purchaseAmounts, purchaseInput, purchaseListInput } from "./purchases";
 const line = {
   itemId: "00000000-0000-4000-8000-000000000001",
   quantity: "1.005",
@@ -50,4 +50,34 @@ test("supplier document dates and required references validate before posting", 
     false,
   );
   assert.equal(purchaseInput.safeParse({ ...data, items: [] }).success, false);
+});
+
+test("purchase filters validate inclusive calendar boundaries and supplier IDs", () => {
+  assert.equal(
+    purchaseListInput.safeParse({
+      from: "2026-02-28",
+      to: "2026-02-28",
+      supplierId: line.itemId,
+    }).success,
+    true,
+  );
+  assert.equal(
+    purchaseListInput.safeParse({ from: "2026-10-24", to: "2026-10-23" })
+      .success,
+    false,
+  );
+  assert.equal(
+    purchaseListInput.safeParse({ from: "2026-02-30" }).success,
+    false,
+  );
+  assert.equal(
+    purchaseListInput.safeParse({ to: "2026-13-01" }).success,
+    false,
+  );
+  assert.equal(
+    purchaseListInput.safeParse({ supplierId: "invalid" }).success,
+    false,
+  );
+  assert.equal(purchaseListInput.parse({ to: "2026-10-24" }).offset, 0);
+  assert.equal(purchaseListInput.safeParse({}).success, true);
 });
